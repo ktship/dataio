@@ -1,10 +1,11 @@
 package dataio
 import "time"
 
-const DEBUG_MODE = false
+const DEBUG_MODE_LOG = false
+const DEBUG_MODE_UNIT_CONSUMED_LOG = true
 //const URL_dynamoDB = "us-west-2"
 const URL_dynamoDB = "http://localhost:8000"
-const TIMEOUT = 1 * time.Minute
+const TIMEOUT = 3 * time.Minute
 
 const TABLE_NAME_COUNTER = "counter"
 const TABLE_NAME_ACCOUNTS = "accounts"

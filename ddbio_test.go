@@ -66,20 +66,65 @@ func (s *TableSuite) TearDownSuite(c *C) {
 
 var _ = Suite(&TableSuite {})
 
-func (s *TableSuite) Test001_CreateUser(c *C) {
-	log.Println("# CreateUser")
+func (s *TableSuite) Test001_BasicReadWrite(c *C) {
+	log.Println("# Tests to read/write item")
 
+	// 일단 데이터를 씀.
+	tt := time.Now().Unix()
 	data := map[string]interface{} {
-		"createTime": time.Now().Unix(),
+		"createTime":tt,
+		"greeting": "hello",
+	}
+	newMap := map[string]interface{} {
 		"zzz": map[string]interface{} {
 			"a": "test",
-			"b": "Fds",
+			"b": 1234,
 		},
 	}
-	err := s.ddbio.WriteItemAttributes("users", "uid", "1234", data)
+	var err error
+	err = s.ddbio.WriteItemAttributes("users", "uid", "111", data, newMap)
 	if (err != nil) {
-		log.Printf("%s \n", err)
+		c.Fatal(err)
 	}
+
+	err = s.ddbio.WriteItemAttributes("users", "uid", "222", data, nil)
+	if (err != nil) {
+		c.Fatal(err)
+	}
+
+	err = s.ddbio.WriteItemAttributes("users", "uid", "333", nil, newMap)
+	if (err != nil) {
+		c.Fatal(err)
+	}
+
+	// -----
+	resp, errRead := s.ddbio.ReadItemAll("users", "uid", "111")
+	if (errRead != nil) {
+		c.Fatal(err)
+	}
+
+	if (resp["createTime"] != int(tt)) {
+		c.Fatalf(" createTime(%d) is not %d... type: %T", resp["createTime"], tt, resp["createTime"])
+	}
+	if (resp["greeting"] != "hello") {
+		c.Fatalf(" greeting(%s) is not tt... type: %T", resp["greeting"], resp["greeting"])
+	}
+
+	// 1차적으로 쓴 내용 확인.
+	zzz := resp["zzz"].(map[string]interface{})
+	str := zzz["a"]
+	intb := zzz["b"]
+	if (str != "test") {
+		c.Fatalf(" str(%s) is not test...", str)
+	}
+	if (intb != 1234) {
+		c.Fatalf(" dd(%d) is not 1234... type: %T", intb, intb)
+	}
+
+	// 2차적으로 데이터 갱신
+
+	// 2차적으로 갱신한 데이터 확인
+
 }
 
 func (s *TableSuite) Test002(c *C) {
