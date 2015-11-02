@@ -2,12 +2,13 @@ package dataio
 
 import (
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"log"
 	"time"
 	"bytes"
 	"strconv"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
 var config = &aws.Config {
@@ -22,7 +23,7 @@ type Ddbio struct {
 
 func NewDB() *Ddbio {
 	return &Ddbio{
-		db: dynamodb.New(config),
+		db: dynamodb.New(session.New(), config),
 	}
 }
 
