@@ -13,10 +13,12 @@ func Test(t *testing.T) { TestingT(t) }
 
 type TableSuite struct {
 	ddbio *Ddbio
+	cio   *cio
 }
 
 func (s *TableSuite) SetUpSuite(c *C) {
 	s.ddbio = NewDB()
+	s.cio = NewCache()
 
 	list, err := s.ddbio.ListTables()
 	if err != nil {
@@ -87,6 +89,11 @@ func (s *TableSuite) Test001_BasicReadWrite(c *C) {
 		c.Fatal(err)
 	}
 
+	err = s.cio.WriteItemAttributes("users", "uid", "111", data, newMap)
+	if (err != nil) {
+		c.Fatal(err)
+	}
+
 	err = s.ddbio.WriteItemAttributes("users", "uid", "222", data, nil)
 	if (err != nil) {
 		c.Fatal(err)
@@ -102,14 +109,12 @@ func (s *TableSuite) Test001_BasicReadWrite(c *C) {
 	if (errRead != nil) {
 		c.Fatal(err)
 	}
-
 	if (resp["createTime"] != int(tt)) {
 		c.Fatalf(" createTime(%d) is not %d... type: %T", resp["createTime"], tt, resp["createTime"])
 	}
 	if (resp["greeting"] != "hello") {
 		c.Fatalf(" greeting(%s) is not tt... type: %T", resp["greeting"], resp["greeting"])
 	}
-
 	// 1차적으로 쓴 내용 확인.
 	zzz := resp["zzz"].(map[string]interface{})
 	str := zzz["a"]
@@ -120,11 +125,58 @@ func (s *TableSuite) Test001_BasicReadWrite(c *C) {
 	if (intb != 1234) {
 		c.Fatalf(" dd(%d) is not 1234... type: %T", intb, intb)
 	}
+	
+	// cache 내용 읽기
+	keys := []string {"greeting", "createTime", "asdf"}
+	hashKeys := []string {"zzz"}
+	resp, errRead = s.cio.ReadItems("users", "uid", "111", keys, hashKeys)
+	if (errRead != nil) {
+		c.Fatal(err)
+	}
+	log.Printf("cache greeting : %s", resp["greeting"])
+	log.Printf("cache createTime : %d", resp["createTime"])
+	log.Printf("cache zzz : %v", resp["zzz"])
 
 	// 2차적으로 데이터 갱신
+	newData := map[string]interface{} {
+		"greeting": "hello 2",
+		"greeting2": "hi hi",
+		"zzz": map[string]interface{} {
+			"a": "new test",
+			"b": 1234,
+			"c": "ccccccc",
+			"d": 321321,
+		},
+	}
+	err = s.ddbio.WriteItemAttributes("users", "uid", "111", newData, nil)
+	if (err != nil) {
+		c.Fatal(err)
+	}
 
 	// 2차적으로 갱신한 데이터 확인
-
+	resp, errRead = s.ddbio.ReadItemAll("users", "uid", "111")
+	if (errRead != nil) {
+		c.Fatal(err)
+	}
+	if (resp["greeting"] != "hello 2") {
+		c.Fatalf(" str(%s) is not test...", resp["greeting"])
+	}
+	if (resp["greeting2"] != "hi hi") {
+		c.Fatalf(" str(%s) is not test...", resp["greeting2"])
+	}
+	zzz2 := resp["zzz"].(map[string]interface{})
+	if (zzz2["a"] != "new test") {
+		c.Fatalf(" str(%s) is not test...", zzz2["a"])
+	}
+	if (zzz2["b"] != 1234) {
+		c.Fatalf(" dd(%d) is not test...", zzz2["b"])
+	}
+	if (zzz2["c"] != "ccccccc") {
+		c.Fatalf(" dd(%s) is not test...", zzz2["c"])
+	}
+	if (zzz2["d"] != 321321) {
+		c.Fatalf(" dd(%d) is not test...", zzz2["d"])
+	}
 }
 
 func (s *TableSuite) Test002(c *C) {
