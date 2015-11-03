@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"bytes"
 	"log"
+	"strconv"
 )
 
 /*
 	캐시에 저장되는 기본 포멧
-	테이블 명:기본키명:기본키값:(레인지키명:레인지키값):실제 데이터(string, int, 해쉬)
+	u:1012 Hash
+	 +- 해시키-값
  */
 func newPool() *redis.Pool {
 	return &redis.Pool{
@@ -42,69 +44,89 @@ func NewCache() *cio {
 	}
 }
 
-func (io *cio)ReadItems(tableName string, keyName string, keyValue string, attrs []string, hashAttrs []string) (map[string]interface{}, error) {
+func (io *cio)FlushAll() error {
+	conn := pool.Get()
+	defer conn.Close()
+	conn.Send("MULTI")
+	conn.Send("FLUSHALL")
+	_, err := conn.Do("EXEC")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (io *cio)ReadItems(category string, key string, numAttrs []string, strAttrs []string) (map[string]interface{}, error) {
 	conn := pool.Get()
 	defer conn.Close()
 	conn.Send("MULTI")
 
-	var buffer bytes.Buffer
-	for _, v := range attrs {
-		buffer.WriteString(fmt.Sprintf("%s:%s:%s:%s", tableName, keyName, keyValue, v))
-		cacheKey := buffer.String()
-		conn.Send("GET", cacheKey)
-		buffer.Reset()
+	cacheKey :=fmt.Sprintf("%s:%s", category, key)
+	params := make([]interface{}, 0)
+	params = append(params, cacheKey)
+	for _, v := range numAttrs {
+		params = append(params, v)
 	}
-	for _, v := range hashAttrs {
-		buffer.WriteString(fmt.Sprintf("%s:%s:%s:%s", tableName, keyName, keyValue, v))
-		cacheKey := buffer.String()
-		conn.Send("HGETALL", cacheKey)
-		buffer.Reset()
+	for _, v := range strAttrs {
+		params = append(params, v)
 	}
+
+	conn.Send("HMGET", params...)
 	resp, err := conn.Do("EXEC")
 	if err != nil {
 		return nil, err
 	}
 
-	out := resp.([]interface{})
-	log.Printf("cio ReadItemAll : %v", out)
-	log.Printf("cio ReadItemAll : %T", out)
-	bb := []interface{} { 1, 2}
-	log.Printf("bb : %T", bb[0])
+	o := resp.([]interface{})
+	// TODO: 왜 한겹 더 들어갔는지는 잘 모르겠음.
+	out := o[0].([]interface{})
 
-	outMap := make(map[string]interface{})
-	log.Printf("out : %T", out[1])
-	log.Printf("out : %d", out[1])
+	retMap := make(map[string]interface{})
+	for ii, vv := range numAttrs {
+		if out[ii] != nil {
+			num, _ := strconv.Atoi(string(out[ii].([]byte)))
+			retMap[vv] = num
+		} else {
+			retMap[vv] = NULL_NUMBER
+		}
+	}
+	nextCount := len(numAttrs)
+	for ii, vv := range strAttrs {
+		if out[nextCount + ii] != nil {
+			retMap[vv] = string(out[nextCount + ii].([]byte))
+		} else {
+			retMap[vv] = ""
+		}
+	}
 
-	return outMap, nil
+	return retMap, nil
 }
 
-//	conn.Do("SET", "test:1:100", "fdsa")
-//	conn.Do("HSET", "user:1001:jjj", "name", "fdsa")
-func (io *cio)WriteItemAttributes(tableName string, keyName string, keyValue string, updateAttrs map[string]interface{}, newMap map[string]interface{}) (error) {
+func (io *cio)WriteItemAttributes(category string, key string, updateAttrs map[string]interface{}, newMap map[string]interface{}) (error) {
 	conn := pool.Get()
 	defer conn.Close()
 	conn.Send("MULTI")
 
 	var buffer bytes.Buffer
 	for k, v := range updateAttrs {
-		buffer.WriteString(fmt.Sprintf("%s:%s:%s:%s", tableName, keyName, keyValue, k))
+		buffer.WriteString(fmt.Sprintf("%s:%s", category, key))
 		cacheKey := buffer.String()
 		switch t := v.(type) {
 		case string:
-			conn.Send("SET", cacheKey, v.(string))
+			conn.Send("HSET", cacheKey, k, v.(string))
 		case int:
-			conn.Send("SET", cacheKey, v.(int))
+			conn.Send("HSET", cacheKey, k, v.(int))
 		case int64:
-			conn.Send("SET", cacheKey, v.(int64))
+			conn.Send("HSET", cacheKey, k, v.(int64))
 		case map[string]interface{}:
 			for kk, vv := range v.(map[string]interface{}) {
 				switch tt := vv.(type) {
 				case string:
-					conn.Send("HSET", cacheKey, kk, vv.(string))
+					conn.Send("HSET", cacheKey, fmt.Sprintf("%s:%s", k, kk) , vv.(string))
 				case int:
-					conn.Send("HSET", cacheKey, kk, vv.(int))
+					conn.Send("HSET", cacheKey, fmt.Sprintf("%s:%s", k, kk), vv.(int))
 				case int64:
-					conn.Send("HSET", cacheKey, kk, vv.(int64))
+					conn.Send("HSET", cacheKey, fmt.Sprintf("%s:%s", k, kk), vv.(int64))
 				default:
 					_ = tt
 					log.Printf("Cache ERROR: unknown SUB type of attribute.. key: %s, value:%+v", kk, vv)
@@ -120,18 +142,18 @@ func (io *cio)WriteItemAttributes(tableName string, keyName string, keyValue str
 	}
 
 	for k, v := range newMap {
-		buffer.WriteString(fmt.Sprintf("%s:%s:%s:%s", tableName, keyName, keyValue, k))
+		buffer.WriteString(fmt.Sprintf("%s:%s", category, key))
 		cacheKey := buffer.String()
 		switch t := v.(type) {
 		case map[string]interface{}:
 			for kk, vv := range v.(map[string]interface{}) {
 				switch tt := vv.(type) {
 				case string:
-					conn.Send("HSET", cacheKey, kk, vv.(string))
+					conn.Send("HSET", cacheKey, fmt.Sprintf("%s:%s", k, kk) , vv.(string))
 				case int:
-					conn.Send("HSET", cacheKey, kk, vv.(int))
+					conn.Send("HSET", cacheKey, fmt.Sprintf("%s:%s", k, kk), vv.(int))
 				case int64:
-					conn.Send("HSET", cacheKey, kk, vv.(int64))
+					conn.Send("HSET", cacheKey, fmt.Sprintf("%s:%s", k, kk), vv.(int64))
 				default:
 					_ = tt
 					log.Printf("Cache ERROR: unknown SUB type of attribute.. key: %s, value:%+v", kk, vv)
@@ -147,11 +169,8 @@ func (io *cio)WriteItemAttributes(tableName string, keyName string, keyValue str
 	}
 
 	resp, err := conn.Do("EXEC")
-
-	log.Println(resp)
-
+	if DEBUG_MODE_LOG {	log.Println(resp) }
 	return err
-
 }
 
 

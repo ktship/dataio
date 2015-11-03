@@ -15,3 +15,5 @@ const TABLE_NAME_ACCOUNTS = "accounts"
 const TABLE_NAME_USERS = "users"
 
 const KEY_USER_ID = "uid"
+
+const NULL_NUMBER = -99990000
