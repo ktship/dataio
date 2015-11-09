@@ -274,98 +274,29 @@ func (io *Ddbio)PutItem(tableName string, keyName string, keyValue string, attrs
 
 // Table API ----------------------
 
-func (io *Ddbio)CreateCounterTable() error {
-	// JSON 파라메터
-	// 기본키 : name (string) :카운터의 이름. "uid", "payload"등이 있음.
-	// 쓰루풋 : 인 1, 아웃 1
+func (io *Ddbio)CreateHashTable(tabaleName string, pkey string, readCap int, writeCap int) error {
 	params := &dynamodb.CreateTableInput {
-		TableName: aws.String(TABLE_NAME_COUNTER),
+		TableName: aws.String(tabaleName),
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{
 			{
-				AttributeName: aws.String("name"),
+				AttributeName: aws.String(pkey),
 				AttributeType: aws.String("S"),
 			},
 		},
 		KeySchema: []*dynamodb.KeySchemaElement{
 			{
-				AttributeName: aws.String("name"),
+				AttributeName: aws.String(pkey),
 				KeyType:       aws.String("HASH"),
 			},
 		},
 		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
-			ReadCapacityUnits:  aws.Int64(1),
-			WriteCapacityUnits: aws.Int64(1),
+			ReadCapacityUnits:  aws.Int64(int64(readCap)),
+			WriteCapacityUnits: aws.Int64(int64(writeCap)),
 		},
 	}
 	resp, err := io.db.CreateTable(params)
 	if err != nil {
 		log.Printf("DB CreateCounterTable ERROR: %s \n", err)
-		if DEBUG_MODE_LOG { log.Println(err.Error()) }
-		return err
-	}
-	if DEBUG_MODE_LOG { log.Println(resp) }
-	return nil
-}
-
-func (io *Ddbio)CreateAccountTable() error {
-	// JSON 파라메터
-	// 기본키 : name (string) :카운터의 이름. "uid", "payload"등이 있음.
-	// 쓰루풋 : 인 1, 아웃 1
-	params := &dynamodb.CreateTableInput {
-		TableName: aws.String(TABLE_NAME_ACCOUNTS),
-		AttributeDefinitions: []*dynamodb.AttributeDefinition{
-			{
-				AttributeName: aws.String("name"),
-				AttributeType: aws.String("S"),
-			},
-		},
-		KeySchema: []*dynamodb.KeySchemaElement{
-			{
-				AttributeName: aws.String("name"),
-				KeyType:       aws.String("HASH"),
-			},
-		},
-		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
-			ReadCapacityUnits:  aws.Int64(1),
-			WriteCapacityUnits: aws.Int64(1),
-		},
-	}
-	resp, err := io.db.CreateTable(params)
-	if err != nil {
-		log.Printf("DB CreateAccountTable ERROR: %s \n", err)
-		if DEBUG_MODE_LOG { log.Println(err.Error()) }
-		return err
-	}
-	if DEBUG_MODE_LOG { log.Println(resp) }
-	return nil
-}
-
-func (io *Ddbio)CreateUserTable() error {
-	// JSON 파라메터
-	// 기본키 : uid (string)
-	// 쓰루풋 : 인 1, 아웃 1
-	params := &dynamodb.CreateTableInput {
-		TableName: aws.String(TABLE_NAME_USERS),
-		AttributeDefinitions: []*dynamodb.AttributeDefinition{
-			{
-				AttributeName: aws.String("uid"),
-				AttributeType: aws.String("S"),
-			},
-		},
-		KeySchema: []*dynamodb.KeySchemaElement{
-			{
-				AttributeName: aws.String("uid"),
-				KeyType:       aws.String("HASH"),
-			},
-		},
-		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
-			ReadCapacityUnits:  aws.Int64(1),
-			WriteCapacityUnits: aws.Int64(1),
-		},
-	}
-	resp, err := io.db.CreateTable(params)
-	if err != nil {
-		log.Printf("DB CreateUserTable ERROR: %s \n", err)
 		if DEBUG_MODE_LOG { log.Println(err.Error()) }
 		return err
 	}

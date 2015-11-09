@@ -1,6 +1,7 @@
 package dataio
 import "time"
 
+const TTL_CACHE_USER_DATA = 24*60*60*2
 const DEBUG_MODE_LOG = false
 const DEBUG_MODE_UNIT_CONSUMED_LOG = true
 //const URL_dynamoDB = "us-west-2"

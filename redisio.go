@@ -35,12 +35,12 @@ func newPool() *redis.Pool {
 var pool = newPool()
 
 type cio struct {
-
+	ttl 	int
 }
 
 func NewCache() *cio {
 	return &cio{
-
+		ttl:	TTL_CACHE_USER_DATA,
 	}
 }
 
@@ -48,12 +48,20 @@ func (io *cio)FlushAll() error {
 	conn := pool.Get()
 	defer conn.Close()
 	conn.Send("MULTI")
-	conn.Send("FLUSHALL")
+	conn.Send("FLUSH", 6)
 	_, err := conn.Do("EXEC")
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func (io *cio)GetTTL() int {
+	return io.ttl
+}
+
+func (io *cio)SetTTL(sec int) {
+	io.ttl = sec
 }
 
 func (io *cio)ReadItems(category string, key string, numAttrs []string, strAttrs []string) (map[string]interface{}, error) {
@@ -72,6 +80,7 @@ func (io *cio)ReadItems(category string, key string, numAttrs []string, strAttrs
 	}
 
 	conn.Send("HMGET", params...)
+	conn.Send("EXPIRE", cacheKey, io.ttl);
 	resp, err := conn.Do("EXEC")
 	if err != nil {
 		return nil, err
@@ -80,12 +89,20 @@ func (io *cio)ReadItems(category string, key string, numAttrs []string, strAttrs
 	o := resp.([]interface{})
 	// TODO: 왜 한겹 더 들어갔는지는 잘 모르겠음.
 	out := o[0].([]interface{})
-
+	// TODO: 인덱스 1 은 키 존재 유무를 알려주는 것 같음. 이게 맞는거 같지만.. 확인이 안되었음.
+	isExist := o[1]
+	if isExist == int64(0) {
+		return nil, err
+	}
 	retMap := make(map[string]interface{})
 	for ii, vv := range numAttrs {
 		if out[ii] != nil {
-			num, _ := strconv.Atoi(string(out[ii].([]byte)))
-			retMap[vv] = num
+			num, errr := strconv.Atoi(string(out[ii].([]byte)))
+			if errr != nil {
+				retMap[vv] = NULL_NUMBER
+			} else {
+				retMap[vv] = num
+			}
 		} else {
 			retMap[vv] = NULL_NUMBER
 		}
@@ -99,7 +116,7 @@ func (io *cio)ReadItems(category string, key string, numAttrs []string, strAttrs
 		}
 	}
 
-	return retMap, nil
+	return retMap, err
 }
 
 func (io *cio)WriteItemAttributes(category string, key string, updateAttrs map[string]interface{}, newMap map[string]interface{}) (error) {
@@ -108,9 +125,8 @@ func (io *cio)WriteItemAttributes(category string, key string, updateAttrs map[s
 	conn.Send("MULTI")
 
 	var buffer bytes.Buffer
+	cacheKey := fmt.Sprintf("%s:%s", category, key)
 	for k, v := range updateAttrs {
-		buffer.WriteString(fmt.Sprintf("%s:%s", category, key))
-		cacheKey := buffer.String()
 		switch t := v.(type) {
 		case string:
 			conn.Send("HSET", cacheKey, k, v.(string))
@@ -142,8 +158,6 @@ func (io *cio)WriteItemAttributes(category string, key string, updateAttrs map[s
 	}
 
 	for k, v := range newMap {
-		buffer.WriteString(fmt.Sprintf("%s:%s", category, key))
-		cacheKey := buffer.String()
 		switch t := v.(type) {
 		case map[string]interface{}:
 			for kk, vv := range v.(map[string]interface{}) {
@@ -168,6 +182,8 @@ func (io *cio)WriteItemAttributes(category string, key string, updateAttrs map[s
 		buffer.Reset()
 	}
 
+	// TTL
+	conn.Send("EXPIRE", cacheKey, io.ttl);
 	resp, err := conn.Do("EXEC")
 	if DEBUG_MODE_LOG {	log.Println(resp) }
 	return err

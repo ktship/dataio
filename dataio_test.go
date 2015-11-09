@@ -10,6 +10,10 @@ import (
 )
 
 
+const TEST_TABLE_NAME_USERS = "test_users"
+const TEST_TABLE_NAME_ACCOUNTS = "test_accounts"
+const TEST_CACHE_NAME_USERS = "u"
+
 func Test(t *testing.T) { TestingT(t) }
 
 type TableSuite struct {
@@ -28,27 +32,28 @@ func (s *TableSuite) SetUpSuite(c *C) {
 	if err != nil {
 		c.Fatal(err)
 	}
-	if s.ddbio.isExistTableByName(list.TableNames, TABLE_NAME_USERS) {
-		if err := s.ddbio.DeleteTable(TABLE_NAME_USERS) ; err != nil {
+	if s.ddbio.isExistTableByName(list.TableNames, TEST_TABLE_NAME_USERS) {
+		if err := s.ddbio.DeleteTable(TEST_TABLE_NAME_USERS) ; err != nil {
 			c.Fatal(err)
 		}
 	}
-	if s.ddbio.isExistTableByName(list.TableNames, TABLE_NAME_ACCOUNTS) {
-		if err := s.ddbio.DeleteTable(TABLE_NAME_ACCOUNTS) ; err != nil {
+	if s.ddbio.isExistTableByName(list.TableNames, TEST_TABLE_NAME_ACCOUNTS) {
+		if err := s.ddbio.DeleteTable(TEST_TABLE_NAME_ACCOUNTS) ; err != nil {
 			c.Fatal(err)
 		}
 	}
 
-	if err = s.ddbio.CreateUserTable() ; err != nil {
+	if err = s.ddbio.CreateHashTable(TEST_TABLE_NAME_USERS, "uid", 1, 1) ; err != nil {
 		c.Fatal(err)
 	}
-	if err = s.ddbio.CreateAccountTable() ; err != nil {
+	if err = s.ddbio.CreateHashTable(TEST_TABLE_NAME_ACCOUNTS, "uid", 1, 1) ; err != nil {
 		c.Fatal(err)
 	}
 
-	s.ddbio.WaitUntilStatus(TABLE_NAME_USERS, "ACTIVE")
+	s.ddbio.WaitUntilStatus(TEST_TABLE_NAME_USERS, "ACTIVE")
 
 	s.cio.FlushAll()
+	s.cio.SetTTL(10)
 }
 func (s *TableSuite) SetUpTest(c *C) {
 	fmt.Printf("SetUpTest...  \n")
@@ -59,7 +64,7 @@ func (s *TableSuite) TearDownTest(c *C) {
 func (s *TableSuite) TearDownSuite(c *C) {
 	fmt.Printf("TearDownSuite...  \n")
 
-	if err := s.ddbio.DeleteTable(TABLE_NAME_USERS) ; err != nil {
+	if err := s.ddbio.DeleteTable(TEST_TABLE_NAME_USERS) ; err != nil {
 		c.Fatal(err)
 	}
 }
@@ -96,23 +101,23 @@ func (s *TableSuite) Test001_DynamoDBIO(c *C) {
 
 	// 일단 데이터를 씀.
 	var err error
-	err = s.ddbio.WriteItemAttributes("users", "uid", "111", s.data, s.nMap)
+	err = s.ddbio.WriteItemAttributes(TEST_TABLE_NAME_USERS, "uid", "111", s.data, s.nMap)
 	if (err != nil) {
 		c.Fatal(err)
 	}
 
-	err = s.ddbio.WriteItemAttributes("users", "uid", "222", s.data, nil)
+	err = s.ddbio.WriteItemAttributes(TEST_TABLE_NAME_USERS, "uid", "222", s.data, nil)
 	if (err != nil) {
 		c.Fatal(err)
 	}
 
-	err = s.ddbio.WriteItemAttributes("users", "uid", "333", nil, s.nMap)
+	err = s.ddbio.WriteItemAttributes(TEST_TABLE_NAME_USERS, "uid", "333", nil, s.nMap)
 	if (err != nil) {
 		c.Fatal(err)
 	}
 
 	// 1차적으로 쓴 내용 확인.
-	resp, errRead := s.ddbio.ReadItemAll("users", "uid", "111")
+	resp, errRead := s.ddbio.ReadItemAll(TEST_TABLE_NAME_USERS, "uid", "111")
 	if (errRead != nil) {
 		c.Fatal(err)
 	}
@@ -134,13 +139,13 @@ func (s *TableSuite) Test001_DynamoDBIO(c *C) {
 	
 
 	// 2차적으로 데이터 갱신
-	err = s.ddbio.WriteItemAttributes("users", "uid", "111", s.newData, nil)
+	err = s.ddbio.WriteItemAttributes(TEST_TABLE_NAME_USERS, "uid", "111", s.newData, nil)
 	if (err != nil) {
 		c.Fatal(err)
 	}
 
 	// 2차적으로 갱신한 데이터 확인
-	resp, errRead = s.ddbio.ReadItemAll("users", "uid", "111")
+	resp, errRead = s.ddbio.ReadItemAll(TEST_TABLE_NAME_USERS, "uid", "111")
 	if (errRead != nil) {
 		c.Fatal(err)
 	}
@@ -165,12 +170,12 @@ func (s *TableSuite) Test001_DynamoDBIO(c *C) {
 	}
 }
 
-func (s *TableSuite) Test002_CacheIO(c *C) {
+func (s *TableSuite) Test002_CacheIO_BASE(c *C) {
 	log.Println("# Tests to Cache Redis read/write item")
 
 	// 일단 데이터를 씀.
 	var err error
-	err = s.cio.WriteItemAttributes("u", "111", s.data, s.nMap)
+	err = s.cio.WriteItemAttributes(TEST_CACHE_NAME_USERS, "111", s.data, s.nMap)
 	if (err != nil) {
 		c.Fatal(err)
 	}
@@ -178,7 +183,7 @@ func (s *TableSuite) Test002_CacheIO(c *C) {
 	// cache 내용 읽기 --------------------
 	numKeys := []string {"createTime", "zzz:b"}
 	strKeys := []string {"s_greeting", "zzz:ac"}
-	resp, errRead := s.cio.ReadItems("u", "111", numKeys, strKeys)
+	resp, errRead := s.cio.ReadItems(TEST_CACHE_NAME_USERS, "111", numKeys, strKeys)
 	if (errRead != nil) {
 		c.Fatal(errRead)
 	}
@@ -198,7 +203,7 @@ func (s *TableSuite) Test002_CacheIO(c *C) {
 	}
 
 	// 2차적으로 데이터 갱신
-	err = s.cio.WriteItemAttributes("u", "111", s.newData, nil)
+	err = s.cio.WriteItemAttributes(TEST_CACHE_NAME_USERS, "111", s.newData, nil)
 	if (err != nil) {
 		c.Fatal(err)
 	}
@@ -206,11 +211,10 @@ func (s *TableSuite) Test002_CacheIO(c *C) {
 		// 2차적으로 갱신한 데이터 확인
 		numKeys := []string {"zzz:b", "zzz:d", "fdsa", "ff", "zzz:c"}
 		strKeys := []string {"greeting", "greeting2", "zzz:ac", "nobady", "createTime"}
-		resp, errRead := s.cio.ReadItems("u", "111", numKeys, strKeys)
+		resp, errRead := s.cio.ReadItems(TEST_CACHE_NAME_USERS, "111", numKeys, strKeys)
 		if (errRead != nil) {
 			c.Fatal(err)
 		}
-		log.Printf("resp : %v", resp)
 		if (resp["createTime"] != strconv.Itoa(int(s.tt))) {
 			c.Fatalf(" str(%s) is not test...", resp["greeting"])
 		}
@@ -226,8 +230,8 @@ func (s *TableSuite) Test002_CacheIO(c *C) {
 		if resp["zzz:b"] != 1234 {
 			c.Fatalf(" dd(%d) is not test...", resp["zzz:b"])
 		}
-		if resp["zzz:c"] != "ccccccc" {
-//			c.Fatalf(" dd(%s) is not test...", resp["zzz:c"])
+		if resp["zzz:c"] != NULL_NUMBER {
+			c.Fatalf(" dd(%s) is not test...", resp["zzz:c"])
 		}
 		if resp["zzz:d"] != 321321 {
 			c.Fatalf(" dd(%d) is not test...", resp["zzz:d"])
@@ -236,7 +240,63 @@ func (s *TableSuite) Test002_CacheIO(c *C) {
 			c.Fatalf(" resp[ff](%d) is not NULL_NUMBER...", resp["ff"])
 		}
 	}
+
+	// 키가 없을때는 resp는 nil 이 와야함.
+	{
+		numKeys := []string {"createTime", "zzz:b"}
+		strKeys := []string {"s_greeting", "zzz:ac"}
+		resp, errRead := s.cio.ReadItems(TEST_CACHE_NAME_USERS, "444", numKeys, strKeys)
+		if (errRead != nil) {
+			c.Fatal(errRead)
+		}
+		if resp != nil {
+			c.Fatalf(" Does NOT expired!!! WHY??? ")
+		}
+	}
 }
 
+func (s *TableSuite) Test003_CacheIO_TTL(c *C) {
+	log.Println("# Tests to TTL Cache Redis read/write item")
 
+	// 일단 데이터를 씀.
+	var err error
+	err = s.cio.WriteItemAttributes(TEST_CACHE_NAME_USERS, "111", s.data, s.nMap)
+	if (err != nil) {
+		c.Fatal(err)
+	}
+
+	// cache 내용 읽기 --------------------
+	numKeys := []string {"createTime", "zzz:b"}
+	strKeys := []string {"s_greeting", "zzz:ac"}
+	resp, errRead := s.cio.ReadItems(TEST_CACHE_NAME_USERS, "111", numKeys, strKeys)
+	if (errRead != nil) {
+		c.Fatal(errRead)
+	}
+	ct := resp["createTime"]
+	if (ct != int(s.tt)) {
+		c.Fatalf(" createTime(%d) is not %d... type: %T", ct, s.tt, resp["createTime"])
+	}
+	if (resp["s_greeting"] != "hello") {
+		c.Fatalf(" greeting(%s) is not tt... type: %T", resp["s_greeting"], resp["s_greeting"])
+	}
+	if (resp["zzz:ac"] != "test") {
+		c.Fatalf(" str(%s) is not test...", resp["zzz:ac"])
+	}
+	if (resp["zzz:b"] != 1234) {
+		c.Fatalf(" dd(%d) is not 1234... type: %T", resp["zzz:b"])
+	}
+
+	time.Sleep(time.Second * (time.Duration)(s.cio.GetTTL() + 1))
+
+	// Expire 된 키는 소멸되어야함. resp nil체크
+	numKeys = []string {"createTime", "zzz:b"}
+	strKeys = []string {"s_greeting", "zzz:ac"}
+	resp, errRead = s.cio.ReadItems(TEST_CACHE_NAME_USERS, "111", numKeys, strKeys)
+	if (errRead != nil) {
+		c.Fatal(errRead)
+	}
+	if resp != nil {
+		c.Fatalf(" Does NOT expired!!! WHY??? ")
+	}
+}
 
