@@ -17,47 +17,51 @@ var config = &aws.Config {
 	MaxRetries:              aws.Int(2),
 }
 
-type Ddbio struct {
+type ddbio struct {
 	db 	*dynamodb.DynamoDB
 }
 
-func NewDB() *Ddbio {
-	return &Ddbio{
+func NewDB() *ddbio {
+	return &ddbio{
 		db: dynamodb.New(session.New(), config),
 	}
 }
 
-// API -----------------------
+func (io *ddbio)readHashItem(hkey string, hid string, hkey2 string, hid2 string) (map[string]interface{}, error) {
 
-/*
-func (io *Ddbio)ReadUserData(uid string) (map[string]string, error) {
-	dat := new(map[string]string)
-
-	return dat, nil;
-}
-
-func (io *Ddbio)WriteUserData(id string, idSub string, dat map[string]string) error {
-	return nil;
-}
-
-func (io *Ddbio)DeleteUserData(id string, idSub string) error {
-	return nil;
-}
-*/
-// Item API -----------------------
-func (io *Ddbio)ReadItemAll(tableName string, keyName string, keyValue string) (map[string]interface{}, error) {
-	params := &dynamodb.GetItemInput{
-		TableName: aws.String(tableName),
-		Key: map[string]*dynamodb.AttributeValue{ // Required
-			keyName: {
-				S:    aws.String(keyValue),
+	// 파라메터 구성
+	var params *dynamodb.GetItemInput
+	if hkey2 == "" {
+		params = &dynamodb.GetItemInput{
+			TableName: aws.String(hkey),
+			Key: map[string]*dynamodb.AttributeValue{ // Required
+				hkey: {
+					S:    aws.String(hid),
+				},
 			},
-		},
-		ConsistentRead: aws.Bool(true),
-//		ExpressionAttributeNames: map[string]*string{"Key": aws.String("AttributeName"), },
-//		ProjectionExpression:   aws.String("ProjectionExpression"),
-		ReturnConsumedCapacity: aws.String("INDEXES"),
+			ConsistentRead: aws.Bool(true),
+			//		ExpressionAttributeNames: map[string]*string{"Key": aws.String("AttributeName"), },
+			//		ProjectionExpression:   aws.String("ProjectionExpression"),
+			ReturnConsumedCapacity: aws.String("INDEXES"),
+		}
+	} else {
+		params = &dynamodb.GetItemInput{
+			TableName: aws.String(hkey),
+			Key: map[string]*dynamodb.AttributeValue{ // Required
+				hkey: {
+					S:    aws.String(hid),
+				},
+				hkey2: {
+					S:    aws.String(hid2),
+				},
+			},
+			ConsistentRead: aws.Bool(true),
+			//		ExpressionAttributeNames: map[string]*string{"Key": aws.String("AttributeName"), },
+			//		ProjectionExpression:   aws.String("ProjectionExpression"),
+			ReturnConsumedCapacity: aws.String("INDEXES"),
+		}
 	}
+
 	resp, err := io.db.GetItem(params)
 
 	if err != nil {
@@ -76,17 +80,6 @@ func (io *Ddbio)ReadItemAll(tableName string, keyName string, keyValue string) (
 		} else if (v.N != nil) {
 			ii, _ := strconv.ParseInt(*v.N, 10, 0)
 			outMap[k] = int(ii)
-		} else if (v.M != nil) {
-			subMap := make(map[string]interface{})
-			for kk, vv := range v.M {
-				if (vv.S != nil) {
-					subMap[kk] = *vv.S
-				} else if (vv.N != nil) {
-					iii, _ := strconv.ParseInt(*vv.N, 10, 0)
-					subMap[kk] = int(iii)
-				}
-			}
-			outMap[k] = subMap
 		} else {
 			log.Printf("DB ReadItemAll ERROR: unknown type of attr.. check! key: %s, value:%+v", k, v)
 			return nil, fmt.Errorf("DB ReadItemAll ERROR: unknown type of attr.. check! key: %s, value:%+v", k, v)
@@ -96,20 +89,7 @@ func (io *Ddbio)ReadItemAll(tableName string, keyName string, keyValue string) (
 	return outMap, nil
 }
 
-/* 	WriteItemAttributes 주어진 테이블명, 기본키 를 가지고 attr를 갱신함. 맵 attr의 경우는 새로 생성도 함.
-	*** 주의:
-	1. 리스트, 셋 attr은 처리 하지 않음. 에러!
-	2. 맵 attribute의 멤버를 수정할려고 할 시에는 반드시 해당 맵 attr가 미리 존재하고 있어야함. 파라메터4 참고.
-	input :
-		1. tableName string : 수정할 테이블 명
-		2. keyName, keyValue : 기본 키(예, "uid", "1101")
-		3. updateAttrs : 업데이트할 데이터들이 들어가는 값. 맵의 attr도 업데이트 가능하지만, 맵이 생성되어 있는 상태라야만 함.
-		   				 즉, 없는 맵 Attr의 경우는 여기서 하지말고, newMap 으로 새 맵 attr을 만들어서 넣을 것.
-		4. newMap : 이건 옵션. 오직 새 맵 attr을 새로 생성할 때만 사용. 이건 attr을 통채로 Overwrite하므로 꼭 생성할때만 사용할 것.
-	output :
-		error
- */
-func (io *Ddbio)WriteItemAttributes(tableName string, keyName string, keyValue string, updateAttrs map[string]interface{}, newMap map[string]interface{}) (error) {
+func (io *ddbio)writeHashItem(hkey string, hid string, hkey2 string, hid2 string, updateAttrs map[string]interface{}) (error) {
 	exprValues := make(map[string]*dynamodb.AttributeValue)
 	var buffer bytes.Buffer
 	buffer.WriteString("set ")
@@ -125,77 +105,12 @@ func (io *Ddbio)WriteItemAttributes(tableName string, keyName string, keyValue s
 			buffer.WriteString(fmt.Sprintf("%s = %s", k, val))
 			itoa := strconv.Itoa(v.(int))
 			exprValues[val] = &dynamodb.AttributeValue { N: aws.String(itoa), }
-		case int64:
-			itoa := strconv.FormatInt(v.(int64), 10)
-			buffer.WriteString(fmt.Sprintf("%s = %s", k, val))
-			exprValues[val] = &dynamodb.AttributeValue { N: aws.String(itoa), }
-		case map[string]interface{}:
-			subCount := 0
-			for kk, vv := range v.(map[string]interface{}) {
-				subVal := fmt.Sprintf(":v%ds%d", count, subCount)
-				if subCount != 0 { buffer.WriteString(", ") }
-				switch tt := vv.(type) {
-				case string:
-					buffer.WriteString(fmt.Sprintf("%s.%s = %s", k,
-						kk, subVal))
-					exprValues[subVal] = &dynamodb.AttributeValue{ S: aws.String(vv.(string)), }
-				case int:
-					buffer.WriteString(fmt.Sprintf("%s.%s = %s", k, kk, subVal))
-					itoa := strconv.Itoa(vv.(int))
-					exprValues[subVal] = &dynamodb.AttributeValue { N: aws.String(itoa), }
-				case int64:
-					itoa := strconv.FormatInt(vv.(int64), 10)
-					buffer.WriteString(fmt.Sprintf("%s.%s = %s", k, kk, subVal))
-					exprValues[subVal] = &dynamodb.AttributeValue { N: aws.String(itoa), }
-				default:
-					_ = tt
-					log.Printf("DB ERROR: unknown SUB type of attribute.. key: %s, value:%+v", kk, vv)
-					return fmt.Errorf("unknown SUB type of attribute.. key: %s, value:%+v", kk, vv)
-				}
-				subCount++
-			}
 		default:
 			_ = t
 			log.Printf("DB ERROR: unknown type of attribute.. check key: %s, value:%+v", k, v)
 			return fmt.Errorf("DB ERROR: unknown type of attribute.. check key: %s, value:%+v", k, v)
 		}
 		count++
-	}
-
-	count = 0
-	for k, v := range newMap {
-		val := fmt.Sprintf(":nm%d", count)
-		if len(exprValues) != 0 { buffer.WriteString(", ") }
-		buffer.WriteString(fmt.Sprintf("%s = %s", k, val))
-		switch t := v.(type) {
-		case map[string]interface{}:
-			newMapAttrs := make(map[string]*dynamodb.AttributeValue)
-			var newMapAttr *dynamodb.AttributeValue
-			for kk, vv := range v.(map[string]interface{}) {
-				switch tt := vv.(type) {
-				case string:
-					newMapAttr = &dynamodb.AttributeValue{S: aws.String(vv.(string)), }
-				case int:
-					itoa := strconv.Itoa(vv.(int))
-					newMapAttr = &dynamodb.AttributeValue{N: aws.String(itoa), }
-				case int64:
-					itoa := strconv.FormatInt(vv.(int64), 10)
-					newMapAttr = &dynamodb.AttributeValue{N: aws.String(itoa), }
-				default:
-					_ = tt
-					log.Printf("DB ERROR: unknown type of NEW MAP attribute.. check key: %s, value:%+v", kk, vv)
-					return fmt.Errorf("DB ERROR: unknown type of NEW MAP attribute.. check key: %s, value:%+v", kk, vv)
-				}
-				newMapAttrs[kk] = newMapAttr
-			}
-			exprValues[val] = &dynamodb.AttributeValue{
-				M: newMapAttrs,
-			}
-		default:
-			_ = t
-			log.Printf("DB ERROR: unknown type of NEW MAP.. check key: %s, value:%+v", k, v)
-			return fmt.Errorf("DB ERROR: unknown type of NEW MAP.. check key: %s, value:%+v", k, v)
-		}
 	}
 
 	updateExpr := buffer.String()
@@ -205,21 +120,44 @@ func (io *Ddbio)WriteItemAttributes(tableName string, keyName string, keyValue s
 		fmt.Printf("exprValues : %v \n",exprValues)
 	}
 
-	params := &dynamodb.UpdateItemInput{
-		TableName: aws.String(tableName), // Required
-		Key: map[string]*dynamodb.AttributeValue{
-			keyName: {
-				S:    aws.String(keyValue),
+	var params *dynamodb.UpdateItemInput
+	if hkey2 == "" {
+		params = &dynamodb.UpdateItemInput{
+			TableName: aws.String(hkey), // Required
+			Key: map[string]*dynamodb.AttributeValue{
+				hkey: {
+					S:    aws.String(hid),
+				},
 			},
-		},
-		//		ConditionExpression: aws.String("ConditionExpression"),
-		ReturnConsumedCapacity:      aws.String("INDEXES"),
-		ReturnItemCollectionMetrics: aws.String("SIZE"),
-		// ALL_NEW, ALL_OLD, UPDATED_NEW, UPDATED_OLD, NONE
-		ReturnValues:                aws.String("ALL_NEW"), // The old versions of only the updated attributes are returned.
-		UpdateExpression:            aws.String(updateExpr),
-		ExpressionAttributeValues: 	 exprValues,
+			//		ConditionExpression: aws.String("ConditionExpression"),
+			ReturnConsumedCapacity:      aws.String("INDEXES"),
+			ReturnItemCollectionMetrics: aws.String("SIZE"),
+			// ALL_NEW, ALL_OLD, UPDATED_NEW, UPDATED_OLD, NONE
+			ReturnValues:                aws.String("ALL_OLD"), // The old versions of only the updated attributes are returned.
+			UpdateExpression:            aws.String(updateExpr),
+			ExpressionAttributeValues: 	 exprValues,
+		}
+	} else {
+		params = &dynamodb.UpdateItemInput{
+			TableName: aws.String(hkey), // Required
+			Key: map[string]*dynamodb.AttributeValue{
+				hkey: {
+					S:    aws.String(hid),
+				},
+				hkey2: {
+					S:    aws.String(hid2),
+				},
+			},
+			//		ConditionExpression: aws.String("ConditionExpression"),
+			ReturnConsumedCapacity:      aws.String("INDEXES"),
+			ReturnItemCollectionMetrics: aws.String("SIZE"),
+			// ALL_NEW, ALL_OLD, UPDATED_NEW, UPDATED_OLD, NONE
+			ReturnValues:                aws.String("ALL_OLD"), // The old versions of only the updated attributes are returned.
+			UpdateExpression:            aws.String(updateExpr),
+			ExpressionAttributeValues: 	 exprValues,
+		}
 	}
+
 	resp, err := io.db.UpdateItem(params)
 
 	if err != nil {
@@ -234,49 +172,92 @@ func (io *Ddbio)WriteItemAttributes(tableName string, keyName string, keyValue s
 	return nil
 }
 
-func (io *Ddbio)PutItem(tableName string, keyName string, keyValue string, attrs map[string]interface{}) (error) {
-//	exprValues := make(map[string]*dynamodb.AttributeValue)
-	if ( len(attrs) != 0 ) {
-		return fmt.Errorf("PutItem is NOT implemented YET! :)")
-	}
 
-	params := &dynamodb.PutItemInput{
-		TableName:           aws.String(tableName),
-		Item: map[string]*dynamodb.AttributeValue{
-			keyName: {
-				S:    aws.String(keyValue),
-			},
-			"zzz": {
-				M: map[string]*dynamodb.AttributeValue{
-					"Key": {
-						S:    aws.String("value"),
-					},
+func (io *ddbio)delHashItem(hkey string, hid string, hkey2 string, hid2 string) (error) {
+	var params *dynamodb.DeleteItemInput
+	if hkey2 == "" {
+		params = &dynamodb.DeleteItemInput{
+			TableName: aws.String(hkey), // Required
+			Key: map[string]*dynamodb.AttributeValue{
+				hkey: {
+					S:    aws.String(hid),
 				},
 			},
-		},
-//		ConditionExpression: aws.String("ConditionExpression"),
-//		ExpressionAttributeNames: map[string]*string{"Key": aws.String("AttributeName"), },
-//		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{		},
-		ReturnConsumedCapacity:      aws.String("INDEXES"),
-		ReturnItemCollectionMetrics: aws.String("SIZE"),
-		ReturnValues:                aws.String("ALL_OLD"),
+			//		ConditionExpression: aws.String("ConditionExpression"),
+			ReturnConsumedCapacity:      aws.String("INDEXES"),
+			ReturnItemCollectionMetrics: aws.String("SIZE"),
+			// ALL_OLD, NONE
+			ReturnValues:                aws.String("ALL_OLD"), // The old versions of only the updated attributes are returned.
+		}
+	} else {
+		params = &dynamodb.DeleteItemInput{
+			TableName: aws.String(hkey), // Required
+			Key: map[string]*dynamodb.AttributeValue{
+				hkey: {
+					S:    aws.String(hid),
+				},
+				hkey2: {
+					S:    aws.String(hid2),
+				},
+			},
+			//		ConditionExpression: aws.String("ConditionExpression"),
+			ReturnConsumedCapacity:      aws.String("INDEXES"),
+			ReturnItemCollectionMetrics: aws.String("SIZE"),
+			//  ALL_OLD, NONE
+			ReturnValues:                aws.String("ALL_OLD"), // The old versions of only the updated attributes are returned.
+		}
 	}
-	resp, err := io.db.PutItem(params)
+
+	resp, err := io.db.DeleteItem(params)
 
 	if err != nil {
-		log.Printf("DB PutItem ERROR: %s \n", err)
+		log.Printf("DB ERROR: %s \n", err)
 		return err
 	}
-	if DEBUG_MODE_LOG { log.Println("PutItem ----"); log.Println(resp) }
-
+	// Pretty-print the response data.
+	if DEBUG_MODE_LOG {
+		log.Println("DeleteItem ----");
+		log.Println(resp)
+	}
 	return nil
+}
+
+// -------------------------------------------------
+// user
+// -------------------------------------------------
+func (io *ddbio)ReadUser(uid string) (map[string]interface{}, error) {
+	resp, err := io.readHashItem(KEY_CACHE_USER, uid, "", "")
+	return resp, err
+}
+
+func (io *ddbio)WriteUser(uid string, updateAttrs map[string]interface{}) (error) {
+	err := io.writeHashItem(KEY_CACHE_USER, uid, "", "", updateAttrs)
+	return err
+}
+
+// -------------------------------------------------
+// user : task
+// -------------------------------------------------
+func (io *ddbio)ReadUserTask(uid string, tid string) (map[string]interface{}, error) {
+	resp, err := io.readHashItem(KEY_CACHE_USER, uid, KEY_CACHE_TASK, tid)
+	return resp, err
+}
+
+func (io *ddbio)WriteUserTask(uid string, tid string, updateAttrs map[string]interface{}) (error) {
+	err := io.writeHashItem(KEY_CACHE_USER, uid, KEY_CACHE_TASK, tid, updateAttrs)
+	return err
+}
+
+func (io *ddbio)DelUserTask(uid string, tid string) (error) {
+	err := io.delHashItem(KEY_CACHE_USER, uid, KEY_CACHE_TASK, tid)
+	return err
 }
 
 // Table API ----------------------
 
-func (io *Ddbio)CreateHashTable(tabaleName string, pkey string, readCap int, writeCap int) error {
+func (io *ddbio)CreateHashTable(tableName string, pkey string, readCap int, writeCap int) error {
 	params := &dynamodb.CreateTableInput {
-		TableName: aws.String(tabaleName),
+		TableName: aws.String(tableName),
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{
 			{
 				AttributeName: aws.String(pkey),
@@ -304,7 +285,46 @@ func (io *Ddbio)CreateHashTable(tabaleName string, pkey string, readCap int, wri
 	return nil
 }
 
-func (io *Ddbio)ListTables() (*dynamodb.ListTablesOutput, error) {
+func (io *ddbio)CreateHashRangeTable(tableName string, pkey string, pRange string, readCap int, writeCap int) error {
+	params := &dynamodb.CreateTableInput {
+		TableName: aws.String(tableName),
+		AttributeDefinitions: []*dynamodb.AttributeDefinition{
+			{
+				AttributeName: aws.String(pkey),
+				AttributeType: aws.String("S"),
+			},
+			{
+				AttributeName: aws.String(pRange),
+				AttributeType: aws.String("S"),
+			},
+		},
+		KeySchema: []*dynamodb.KeySchemaElement{
+			{
+				AttributeName: aws.String(pkey),
+				KeyType:       aws.String("HASH"),
+			},
+			{
+				AttributeName: aws.String(pRange),
+				KeyType:       aws.String("RANGE"),
+			},
+		},
+		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(int64(readCap)),
+			WriteCapacityUnits: aws.Int64(int64(writeCap)),
+		},
+	}
+	resp, err := io.db.CreateTable(params)
+	if err != nil {
+		log.Printf("DB CreateCounterTable ERROR: %s \n", err)
+		if DEBUG_MODE_LOG { log.Println(err.Error()) }
+		return err
+	}
+	if DEBUG_MODE_LOG { log.Println(resp) }
+	return nil
+}
+
+
+func (io *ddbio)ListTables() (*dynamodb.ListTablesOutput, error) {
 	params := &dynamodb.ListTablesInput {}
 	if tables, err := io.db.ListTables(params); err != nil {
 		log.Println(err)
@@ -315,7 +335,7 @@ func (io *Ddbio)ListTables() (*dynamodb.ListTablesOutput, error) {
 	}
 }
 
-func (io *Ddbio)DescribeTable(tableName string) (*dynamodb.DescribeTableOutput, error) {
+func (io *ddbio)DescribeTable(tableName string) (*dynamodb.DescribeTableOutput, error) {
 	params := &dynamodb.DescribeTableInput{
 		TableName: aws.String(tableName),
 	}
@@ -331,7 +351,7 @@ func (io *Ddbio)DescribeTable(tableName string) (*dynamodb.DescribeTableOutput, 
 	return resp, nil
 }
 
-func (io *Ddbio)DeleteTable(tableName string) error {
+func (io *ddbio)DeleteTable(tableName string) error {
 	params := &dynamodb.DeleteTableInput{
 		TableName: aws.String(tableName),
 	}
@@ -348,7 +368,7 @@ func (io *Ddbio)DeleteTable(tableName string) error {
 	return nil
 }
 
-func (ddbio *Ddbio) WaitUntilStatus(tableName string, status string) {
+func (ddbio *ddbio) WaitUntilStatus(tableName string, status string) {
 	// We should wait until the table is in specified status because a real DynamoDB has some delay for ready
 	done := make(chan bool)
 	timeout := time.After(TIMEOUT)
@@ -380,7 +400,7 @@ func (ddbio *Ddbio) WaitUntilStatus(tableName string, status string) {
 	}
 }
 
-func (ddbio *Ddbio)isExistTableByName(tables []*string, name string) bool {
+func (ddbio *ddbio)isExistTableByName(tables []*string, name string) bool {
 	for _, t := range tables {
 		if *t == name {
 			return true
@@ -389,7 +409,7 @@ func (ddbio *Ddbio)isExistTableByName(tables []*string, name string) bool {
 	return false
 }
 
-func (ddbio *Ddbio)GetTableStatus(tableName string) (*string, error) {
+func (ddbio *ddbio)GetTableStatus(tableName string) (*string, error) {
 	desc, err := ddbio.DescribeTable(tableName)
 	if err != nil {
 		log.Fatal(err)

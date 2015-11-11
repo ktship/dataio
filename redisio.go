@@ -3,9 +3,6 @@ package dataio
 import (
 	"github.com/garyburd/redigo/redis"
 	"fmt"
-	"bytes"
-	"log"
-	"strconv"
 )
 
 /*
@@ -18,18 +15,14 @@ func newPool() *redis.Pool {
 		MaxIdle: 80,
 		MaxActive: 12000, // max number of connections
 		Dial: func() (redis.Conn, error) {
-			c, err := redis.Dial("tcp", URL_LOCAL_REDIS)
+			c, err := redis.Dial("tcp", URL_REDIS)
 			if err != nil {
 				panic(err.Error())
 			}
-
-			if TEST_LOCAL_REDIS {
-				c.Do("SELECT", "6")
-			}
+			c.Do("SELECT", NUM_REDIS_DB)
 			return c, err
 		},
 	}
-
 }
 
 var pool = newPool()
@@ -48,7 +41,7 @@ func (io *cio)FlushAll() error {
 	conn := pool.Get()
 	defer conn.Close()
 	conn.Send("MULTI")
-	conn.Send("FLUSH", 6)
+	conn.Send("FLUSH", NUM_REDIS_DB)
 	_, err := conn.Do("EXEC")
 	if err != nil {
 		return err
@@ -64,22 +57,20 @@ func (io *cio)SetTTL(sec int) {
 	io.ttl = sec
 }
 
-func (io *cio)ReadItems(category string, key string, numAttrs []string, strAttrs []string) (map[string]interface{}, error) {
+// 형태의 키의 값들을 모두 읽음. 예를 들어 uid.task 의 특정 task 의 값들을 모두 읽음
+func (io *cio)readHashItem(hkey string, hid string, hkey2 string, hid2 string) (map[string]interface{}, error) {
 	conn := pool.Get()
 	defer conn.Close()
+
 	conn.Send("MULTI")
-
-	cacheKey :=fmt.Sprintf("%s:%s", category, key)
-	params := make([]interface{}, 0)
-	params = append(params, cacheKey)
-	for _, v := range numAttrs {
-		params = append(params, v)
-	}
-	for _, v := range strAttrs {
-		params = append(params, v)
+	var cacheKey string
+	if hkey != "" {
+		cacheKey =fmt.Sprintf("%s:%s:%s:%s", hkey, hid, hkey2, hid2)
+	} else {
+		cacheKey =fmt.Sprintf("%s:%s", hkey, hid)
 	}
 
-	conn.Send("HMGET", params...)
+	conn.Send("HGETALL", cacheKey)
 	conn.Send("EXPIRE", cacheKey, io.ttl);
 	resp, err := conn.Do("EXEC")
 	if err != nil {
@@ -92,100 +83,94 @@ func (io *cio)ReadItems(category string, key string, numAttrs []string, strAttrs
 	// TODO: 인덱스 1 은 키 존재 유무를 알려주는 것 같음. 이게 맞는거 같지만.. 확인이 안되었음.
 	isExist := o[1]
 	if isExist == int64(0) {
-		return nil, err
+		return nil, fmt.Errorf("NOT EXIST KEY")
 	}
 	retMap := make(map[string]interface{})
-	for ii, vv := range numAttrs {
-		if out[ii] != nil {
-			num, errr := strconv.Atoi(string(out[ii].([]byte)))
-			if errr != nil {
-				retMap[vv] = NULL_NUMBER
-			} else {
-				retMap[vv] = num
-			}
-		} else {
-			retMap[vv] = NULL_NUMBER
-		}
-	}
-	nextCount := len(numAttrs)
-	for ii, vv := range strAttrs {
-		if out[nextCount + ii] != nil {
-			retMap[vv] = string(out[nextCount + ii].([]byte))
-		} else {
-			retMap[vv] = ""
-		}
+	for ii:=0 ; ii<len(out) ; ii = ii+2 {
+		key := string(out[ii].([]byte))
+		retMap[key] = string(out[ii + 1].([]byte))
 	}
 
 	return retMap, err
 }
 
-func (io *cio)WriteItemAttributes(category string, key string, updateAttrs map[string]interface{}, newMap map[string]interface{}) (error) {
+func (io *cio)writeHashItem(hkey string, hid string, hkey2 string, hid2 string, updateAttrs map[string]interface{}) (error) {
 	conn := pool.Get()
 	defer conn.Close()
+
+
 	conn.Send("MULTI")
 
-	var buffer bytes.Buffer
-	cacheKey := fmt.Sprintf("%s:%s", category, key)
-	for k, v := range updateAttrs {
-		switch t := v.(type) {
-		case string:
-			conn.Send("HSET", cacheKey, k, v.(string))
-		case int:
-			conn.Send("HSET", cacheKey, k, v.(int))
-		case int64:
-			conn.Send("HSET", cacheKey, k, v.(int64))
-		case map[string]interface{}:
-			for kk, vv := range v.(map[string]interface{}) {
-				switch tt := vv.(type) {
-				case string:
-					conn.Send("HSET", cacheKey, fmt.Sprintf("%s:%s", k, kk) , vv.(string))
-				case int:
-					conn.Send("HSET", cacheKey, fmt.Sprintf("%s:%s", k, kk), vv.(int))
-				case int64:
-					conn.Send("HSET", cacheKey, fmt.Sprintf("%s:%s", k, kk), vv.(int64))
-				default:
-					_ = tt
-					log.Printf("Cache ERROR: unknown SUB type of attribute.. key: %s, value:%+v", kk, vv)
-					return fmt.Errorf("Cache unknown SUB type of attribute.. key: %s, value:%+v", kk, vv)
-				}
-			}
-		default:
-			_ = t
-			log.Printf("Cache ERROR: unknown type of attribute.. check key: %s, value:%+v", k, v)
-			return fmt.Errorf("Cache ERROR: unknown type of attribute.. check key: %s, value:%+v", k, v)
-		}
-		buffer.Reset()
+	var cacheKey string
+	if hkey != "" {
+		cacheKey =fmt.Sprintf("%s:%s:%s:%s", hkey, hid, hkey2, hid2)
+	} else {
+		cacheKey =fmt.Sprintf("%s:%s", hkey, hid)
 	}
 
-	for k, v := range newMap {
-		switch t := v.(type) {
-		case map[string]interface{}:
-			for kk, vv := range v.(map[string]interface{}) {
-				switch tt := vv.(type) {
-				case string:
-					conn.Send("HSET", cacheKey, fmt.Sprintf("%s:%s", k, kk) , vv.(string))
-				case int:
-					conn.Send("HSET", cacheKey, fmt.Sprintf("%s:%s", k, kk), vv.(int))
-				case int64:
-					conn.Send("HSET", cacheKey, fmt.Sprintf("%s:%s", k, kk), vv.(int64))
-				default:
-					_ = tt
-					log.Printf("Cache ERROR: unknown SUB type of attribute.. key: %s, value:%+v", kk, vv)
-					return fmt.Errorf(" Cache unknown SUB type of attribute.. key: %s, value:%+v", kk, vv)
-				}
-			}
-		default:
-			_ = t
-			log.Printf("Cache ERROR: unknown type of attribute.. check key: %s, value:%+v", k, v)
-			return fmt.Errorf("Cache ERROR: unknown type of attribute.. check key: %s, value:%+v", k, v)
-		}
-		buffer.Reset()
+	// TODO: slice 생성 이거 맞나???
+	params := make([]interface{}, 0)
+	params = append(params, cacheKey)
+	for kk, vv := range updateAttrs {
+		params = append(params, kk)
+		params = append(params, vv)
 	}
 
-	// TTL
+	conn.Send("HMSET", params...)
 	conn.Send("EXPIRE", cacheKey, io.ttl);
-	resp, err := conn.Do("EXEC")
-	if DEBUG_MODE_LOG {	log.Println(resp) }
+	_, err := conn.Do("EXEC")
+
+	return err
+}
+
+
+func (io *cio)delHashItem(hkey string, hid string, hkey2 string, hid2 string) (error) {
+	conn := pool.Get()
+	defer conn.Close()
+
+	conn.Send("MULTI")
+
+	var cacheKey string
+	if hkey != "" {
+		cacheKey =fmt.Sprintf("%s:%s:%s:%s", hkey, hid, hkey2, hid2)
+	} else {
+		cacheKey =fmt.Sprintf("%s:%s", hkey, hid)
+	}
+
+	conn.Send("DEL", cacheKey)
+	_, err := conn.Do("EXEC")
+
+	return err
+}
+
+// -------------------------------------------------
+// user
+// -------------------------------------------------
+func (io *cio)ReadUser(uid string) (map[string]interface{}, error) {
+	resp, err := io.readHashItem(KEY_CACHE_USER, uid, "", "")
+	return resp, err
+}
+
+func (io *cio)WriteUser(uid string, updateAttrs map[string]interface{}) (error) {
+	err := io.writeHashItem(KEY_CACHE_USER, uid, "", "", updateAttrs)
+	return err
+}
+
+// -------------------------------------------------
+// user : task
+// -------------------------------------------------
+func (io *cio)ReadUserTask(uid string, tid string) (map[string]interface{}, error) {
+	resp, err := io.readHashItem(KEY_CACHE_USER, uid, KEY_CACHE_TASK, tid)
+	return resp, err
+}
+
+func (io *cio)WriteUserTask(uid string, tid string, updateAttrs map[string]interface{}) (error) {
+	err := io.writeHashItem(KEY_CACHE_USER, uid, KEY_CACHE_TASK, tid, updateAttrs)
+	return err
+}
+
+func (io *cio)DelUserTask(uid string, tid string) (error) {
+	err := io.delHashItem(KEY_CACHE_USER, uid, KEY_CACHE_TASK, tid)
 	return err
 }
 
