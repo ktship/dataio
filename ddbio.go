@@ -46,7 +46,7 @@ func (io *ddbio)readHashItem(hkey string, hid string, hkey2 string, hid2 string)
 		}
 	} else {
 		params = &dynamodb.GetItemInput{
-			TableName: aws.String(hkey),
+			TableName: aws.String(hkey2),
 			Key: map[string]*dynamodb.AttributeValue{ // Required
 				hkey: {
 					S:    aws.String(hid),
@@ -139,7 +139,7 @@ func (io *ddbio)writeHashItem(hkey string, hid string, hkey2 string, hid2 string
 		}
 	} else {
 		params = &dynamodb.UpdateItemInput{
-			TableName: aws.String(hkey), // Required
+			TableName: aws.String(hkey2), // Required
 			Key: map[string]*dynamodb.AttributeValue{
 				hkey: {
 					S:    aws.String(hid),
@@ -254,10 +254,10 @@ func (io *ddbio)DelUserTask(uid string, tid string) (error) {
 }
 
 // Table API ----------------------
-
-func (io *ddbio)CreateHashTable(tableName string, pkey string, readCap int, writeCap int) error {
+// pkey 가 테이블 이름
+func (io *ddbio)CreateHashTable( pkey string, readCap int, writeCap int) error {
 	params := &dynamodb.CreateTableInput {
-		TableName: aws.String(tableName),
+		TableName: aws.String(pkey),
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{
 			{
 				AttributeName: aws.String(pkey),
@@ -285,9 +285,10 @@ func (io *ddbio)CreateHashTable(tableName string, pkey string, readCap int, writ
 	return nil
 }
 
-func (io *ddbio)CreateHashRangeTable(tableName string, pkey string, pRange string, readCap int, writeCap int) error {
+// pRange 가 테이블 이름
+func (io *ddbio)CreateHashRangeTable(pkey string, pRange string, readCap int, writeCap int) error {
 	params := &dynamodb.CreateTableInput {
-		TableName: aws.String(tableName),
+		TableName: aws.String(pRange),
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{
 			{
 				AttributeName: aws.String(pkey),

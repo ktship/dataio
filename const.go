@@ -25,3 +25,6 @@ const KEY_DB_TASK = "usertasks"
 
 const KEY_CACHE_USER = "u"
 const KEY_CACHE_TASK = "t"
+
+const KEY_USER = "u"
+const KEY_TASK = "t"
