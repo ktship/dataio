@@ -64,7 +64,7 @@ func (io *cio)readHashItem(hkey string, hid string, hkey2 string, hid2 string) (
 
 	conn.Send("MULTI")
 	var cacheKey string
-	if hkey != "" {
+	if hkey2 != "" {
 		cacheKey =fmt.Sprintf("%s:%s:%s:%s", hkey, hid, hkey2, hid2)
 	} else {
 		cacheKey =fmt.Sprintf("%s:%s", hkey, hid)
@@ -98,11 +98,10 @@ func (io *cio)writeHashItem(hkey string, hid string, hkey2 string, hid2 string, 
 	conn := pool.Get()
 	defer conn.Close()
 
-
 	conn.Send("MULTI")
 
 	var cacheKey string
-	if hkey != "" {
+	if hkey2 != "" {
 		cacheKey =fmt.Sprintf("%s:%s:%s:%s", hkey, hid, hkey2, hid2)
 	} else {
 		cacheKey =fmt.Sprintf("%s:%s", hkey, hid)

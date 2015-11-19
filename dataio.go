@@ -1,7 +1,8 @@
 package dataio
+import "strconv"
 
-func New() dataio {
-	return dataio{
+func New() *dataio {
+	return &dataio{
 		ddbio: NewDB(),
 		cio: NewCache(),
 	}
@@ -75,17 +76,17 @@ func (io *dataio)del2Way(hkey string, hid string, hkey2 string, hid2 string) (er
 // -------------------------------------------------
 // user : taskbytime interface
 // -------------------------------------------------
-func (io *dataio)ReadUserTask(uid string, tid string) (map[string]interface{}, error) {
-	resp, err := io.read2Way(KEY_USER, uid, KEY_TASK, tid)
+func (io *dataio)ReadUserTask(uid int, tid int) (map[string]interface{}, error) {
+	resp, err := io.read2Way(KEY_USER, strconv.Itoa(uid), KEY_TASK, strconv.Itoa(tid))
 	return resp, err
 }
 
-func (io *dataio)WriteUserTask(uid string, tid string, updateAttrs map[string]interface{}) (error) {
-	err := io.write2Way(KEY_USER, uid, KEY_TASK, tid, updateAttrs)
+func (io *dataio)WriteUserTask(uid int, tid int, updateAttrs map[string]interface{}) (error) {
+	err := io.write2Way(KEY_USER, strconv.Itoa(uid), KEY_TASK, strconv.Itoa(tid), updateAttrs)
 	return err
 }
 
-func (io *dataio)DelUserTask(uid string, tid string) (error) {
-	err := io.del2Way(KEY_USER, uid, KEY_TASK, tid)
+func (io *dataio)DelUserTask(uid int, tid int) (error) {
+	err := io.del2Way(KEY_USER, strconv.Itoa(uid), KEY_TASK, strconv.Itoa(tid))
 	return err
 }

@@ -81,8 +81,8 @@ func (io *ddbio)readHashItem(hkey string, hid string, hkey2 string, hid2 string)
 			ii, _ := strconv.ParseInt(*v.N, 10, 0)
 			outMap[k] = int(ii)
 		} else {
-			log.Printf("DB ReadItemAll ERROR: unknown type of attr.. check! key: %s, value:%+v", k, v)
-			return nil, fmt.Errorf("DB ReadItemAll ERROR: unknown type of attr.. check! key: %s, value:%+v", k, v)
+			log.Printf("ddbio ReadItemAll ERROR: unknown type of attr.. check! key: %s, value:%+v", k, v)
+			return nil, fmt.Errorf("ddbio ReadItemAll ERROR: unknown type of attr.. check! key: %s, value:%+v", k, v)
 		}
 	}
 
@@ -107,8 +107,8 @@ func (io *ddbio)writeHashItem(hkey string, hid string, hkey2 string, hid2 string
 			exprValues[val] = &dynamodb.AttributeValue { N: aws.String(itoa), }
 		default:
 			_ = t
-			log.Printf("DB ERROR: unknown type of attribute.. check key: %s, value:%+v", k, v)
-			return fmt.Errorf("DB ERROR: unknown type of attribute.. check key: %s, value:%+v", k, v)
+			log.Printf("ddbio writeHashItem ERROR: unknown type of attribute.. check key: %s, value:%+v", k, v)
+			return fmt.Errorf("ddbio writeHashItem ERROR: unknown type of attribute.. check key: %s, value:%+v", k, v)
 		}
 		count++
 	}
@@ -116,12 +116,13 @@ func (io *ddbio)writeHashItem(hkey string, hid string, hkey2 string, hid2 string
 	updateExpr := buffer.String()
 
 	if DEBUG_MODE_LOG {
-		fmt.Printf("updateExpr : %s \n",updateExpr)
-		fmt.Printf("exprValues : %v \n",exprValues)
+		log.Printf("updateExpr : %s \n",updateExpr)
+		log.Printf("exprValues : %v \n",exprValues)
 	}
 
 	var params *dynamodb.UpdateItemInput
 	if hkey2 == "" {
+		log.Printf("writeHashItem tableName : %v \n",hkey)
 		params = &dynamodb.UpdateItemInput{
 			TableName: aws.String(hkey), // Required
 			Key: map[string]*dynamodb.AttributeValue{
@@ -138,6 +139,7 @@ func (io *ddbio)writeHashItem(hkey string, hid string, hkey2 string, hid2 string
 			ExpressionAttributeValues: 	 exprValues,
 		}
 	} else {
+		log.Printf("writeHashItem tableName : %v \n",hkey2)
 		params = &dynamodb.UpdateItemInput{
 			TableName: aws.String(hkey2), // Required
 			Key: map[string]*dynamodb.AttributeValue{
@@ -159,9 +161,11 @@ func (io *ddbio)writeHashItem(hkey string, hid string, hkey2 string, hid2 string
 	}
 
 	resp, err := io.db.UpdateItem(params)
+	log.Printf("writeHashItem updateExpr : %s \n",updateExpr)
+	log.Printf("writeHashItem exprValues : %v \n",exprValues)
 
 	if err != nil {
-		log.Printf("DB ERROR: %s \n", err)
+		log.Printf("ddbio writeHashItem ERROR: %s \n", err)
 		return err
 	}
 	// Pretty-print the response data.
@@ -211,7 +215,7 @@ func (io *ddbio)delHashItem(hkey string, hid string, hkey2 string, hid2 string) 
 	resp, err := io.db.DeleteItem(params)
 
 	if err != nil {
-		log.Printf("DB ERROR: %s \n", err)
+		log.Printf("ddbio delHashItem ERROR: %s \n", err)
 		return err
 	}
 	// Pretty-print the response data.
@@ -277,7 +281,7 @@ func (io *ddbio)CreateHashTable( pkey string, readCap int, writeCap int) error {
 	}
 	resp, err := io.db.CreateTable(params)
 	if err != nil {
-		log.Printf("DB CreateCounterTable ERROR: %s \n", err)
+		log.Printf("ddbio CreateCounterTable ERROR: %s \n", err)
 		if DEBUG_MODE_LOG { log.Println(err.Error()) }
 		return err
 	}
@@ -316,7 +320,7 @@ func (io *ddbio)CreateHashRangeTable(pkey string, pRange string, readCap int, wr
 	}
 	resp, err := io.db.CreateTable(params)
 	if err != nil {
-		log.Printf("DB CreateCounterTable ERROR: %s \n", err)
+		log.Printf("ddbio CreateCounterTable ERROR: %s \n", err)
 		if DEBUG_MODE_LOG { log.Println(err.Error()) }
 		return err
 	}
@@ -343,7 +347,7 @@ func (io *ddbio)DescribeTable(tableName string) (*dynamodb.DescribeTableOutput, 
 	resp, err := io.db.DescribeTable(params)
 
 	if err != nil {
-		log.Printf("DB DescribeTable ERROR: %s \n", err)
+		log.Printf("ddbio DescribeTable ERROR: %s \n", err)
 		if DEBUG_MODE_LOG { log.Println(err.Error()) }
 		return resp, err
 	}
@@ -359,7 +363,7 @@ func (io *ddbio)DeleteTable(tableName string) error {
 	resp, err := io.db.DeleteTable(params)
 
 	if err != nil {
-		log.Printf("DB DeleteTable ERROR: %s \n", err)
+		log.Printf("ddbio DeleteTable ERROR: %s \n", err)
 		if DEBUG_MODE_LOG { log.Println(err.Error()) }
 		return err
 	}

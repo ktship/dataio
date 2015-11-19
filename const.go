@@ -9,7 +9,7 @@ const TTL_CACHE_USER_DATA = 24*60*60*2
 const TIMEOUT = 3 * time.Minute
 
 const DEBUG_MODE_LOG = false
-const DEBUG_MODE_UNIT_CONSUMED_LOG = true
+const DEBUG_MODE_UNIT_CONSUMED_LOG = false
 //const URL_dynamoDB = "us-west-2"
 
 
@@ -26,5 +26,5 @@ const KEY_DB_TASK = "usertasks"
 const KEY_CACHE_USER = "u"
 const KEY_CACHE_TASK = "t"
 
-const KEY_USER = "u"
-const KEY_TASK = "t"
+const KEY_USER = "user"
+const KEY_TASK = "task"
