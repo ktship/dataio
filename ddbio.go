@@ -122,7 +122,7 @@ func (io *ddbio)writeHashItem(hkey string, hid string, hkey2 string, hid2 string
 
 	var params *dynamodb.UpdateItemInput
 	if hkey2 == "" {
-		log.Printf("writeHashItem tableName : %v \n",hkey)
+		log.Printf("TableName : %s \n",hkey)
 		params = &dynamodb.UpdateItemInput{
 			TableName: aws.String(hkey), // Required
 			Key: map[string]*dynamodb.AttributeValue{
@@ -139,7 +139,7 @@ func (io *ddbio)writeHashItem(hkey string, hid string, hkey2 string, hid2 string
 			ExpressionAttributeValues: 	 exprValues,
 		}
 	} else {
-		log.Printf("writeHashItem tableName : %v \n",hkey2)
+		log.Printf("TableName : %s \n",hkey2)
 		params = &dynamodb.UpdateItemInput{
 			TableName: aws.String(hkey2), // Required
 			Key: map[string]*dynamodb.AttributeValue{
@@ -161,9 +161,6 @@ func (io *ddbio)writeHashItem(hkey string, hid string, hkey2 string, hid2 string
 	}
 
 	resp, err := io.db.UpdateItem(params)
-	log.Printf("writeHashItem updateExpr : %s \n",updateExpr)
-	log.Printf("writeHashItem exprValues : %v \n",exprValues)
-
 	if err != nil {
 		log.Printf("ddbio writeHashItem ERROR: %s \n", err)
 		return err
@@ -226,40 +223,9 @@ func (io *ddbio)delHashItem(hkey string, hid string, hkey2 string, hid2 string) 
 	return nil
 }
 
-// -------------------------------------------------
-// user
-// -------------------------------------------------
-func (io *ddbio)ReadUser(uid string) (map[string]interface{}, error) {
-	resp, err := io.readHashItem(KEY_CACHE_USER, uid, "", "")
-	return resp, err
-}
-
-func (io *ddbio)WriteUser(uid string, updateAttrs map[string]interface{}) (error) {
-	err := io.writeHashItem(KEY_CACHE_USER, uid, "", "", updateAttrs)
-	return err
-}
-
-// -------------------------------------------------
-// user : task
-// -------------------------------------------------
-func (io *ddbio)ReadUserTask(uid string, tid string) (map[string]interface{}, error) {
-	resp, err := io.readHashItem(KEY_CACHE_USER, uid, KEY_CACHE_TASK, tid)
-	return resp, err
-}
-
-func (io *ddbio)WriteUserTask(uid string, tid string, updateAttrs map[string]interface{}) (error) {
-	err := io.writeHashItem(KEY_CACHE_USER, uid, KEY_CACHE_TASK, tid, updateAttrs)
-	return err
-}
-
-func (io *ddbio)DelUserTask(uid string, tid string) (error) {
-	err := io.delHashItem(KEY_CACHE_USER, uid, KEY_CACHE_TASK, tid)
-	return err
-}
-
 // Table API ----------------------
 // pkey 가 테이블 이름
-func (io *ddbio)CreateHashTable( pkey string, readCap int, writeCap int) error {
+func (io *ddbio)createHashTable( pkey string, readCap int, writeCap int) error {
 	params := &dynamodb.CreateTableInput {
 		TableName: aws.String(pkey),
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{
@@ -328,8 +294,7 @@ func (io *ddbio)CreateHashRangeTable(pkey string, pRange string, readCap int, wr
 	return nil
 }
 
-
-func (io *ddbio)ListTables() (*dynamodb.ListTablesOutput, error) {
+func (io *ddbio)listTables() (*dynamodb.ListTablesOutput, error) {
 	params := &dynamodb.ListTablesInput {}
 	if tables, err := io.db.ListTables(params); err != nil {
 		log.Println(err)
@@ -340,7 +305,7 @@ func (io *ddbio)ListTables() (*dynamodb.ListTablesOutput, error) {
 	}
 }
 
-func (io *ddbio)DescribeTable(tableName string) (*dynamodb.DescribeTableOutput, error) {
+func (io *ddbio)describeTable(tableName string) (*dynamodb.DescribeTableOutput, error) {
 	params := &dynamodb.DescribeTableInput{
 		TableName: aws.String(tableName),
 	}
@@ -356,7 +321,7 @@ func (io *ddbio)DescribeTable(tableName string) (*dynamodb.DescribeTableOutput, 
 	return resp, nil
 }
 
-func (io *ddbio)DeleteTable(tableName string) error {
+func (io *ddbio)deleteTable(tableName string) error {
 	params := &dynamodb.DeleteTableInput{
 		TableName: aws.String(tableName),
 	}
@@ -373,7 +338,7 @@ func (io *ddbio)DeleteTable(tableName string) error {
 	return nil
 }
 
-func (ddbio *ddbio) WaitUntilStatus(tableName string, status string) {
+func (ddbio *ddbio) waitUntilStatus(tableName string, status string) {
 	// We should wait until the table is in specified status because a real DynamoDB has some delay for ready
 	done := make(chan bool)
 	timeout := time.After(TIMEOUT)
@@ -384,7 +349,7 @@ func (ddbio *ddbio) WaitUntilStatus(tableName string, status string) {
 				log.Println("channel done is closed")
 				return
 			default:
-				desc, err := ddbio.DescribeTable(tableName)
+				desc, err := ddbio.describeTable(tableName)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -414,8 +379,8 @@ func (ddbio *ddbio)isExistTableByName(tables []*string, name string) bool {
 	return false
 }
 
-func (ddbio *ddbio)GetTableStatus(tableName string) (*string, error) {
-	desc, err := ddbio.DescribeTable(tableName)
+func (ddbio *ddbio)getTableStatus(tableName string) (*string, error) {
+	desc, err := ddbio.describeTable(tableName)
 	if err != nil {
 		log.Fatal(err)
 		return nil, err

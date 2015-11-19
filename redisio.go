@@ -37,7 +37,7 @@ func NewCache() *cio {
 	}
 }
 
-func (io *cio)FlushAll() error {
+func (io *cio)FlushDB() error {
 	conn := pool.Get()
 	defer conn.Close()
 	conn.Send("MULTI")
@@ -139,37 +139,6 @@ func (io *cio)delHashItem(hkey string, hid string, hkey2 string, hid2 string) (e
 	conn.Send("DEL", cacheKey)
 	_, err := conn.Do("EXEC")
 
-	return err
-}
-
-// -------------------------------------------------
-// user
-// -------------------------------------------------
-func (io *cio)ReadUser(uid string) (map[string]interface{}, error) {
-	resp, err := io.readHashItem(KEY_CACHE_USER, uid, "", "")
-	return resp, err
-}
-
-func (io *cio)WriteUser(uid string, updateAttrs map[string]interface{}) (error) {
-	err := io.writeHashItem(KEY_CACHE_USER, uid, "", "", updateAttrs)
-	return err
-}
-
-// -------------------------------------------------
-// user : task
-// -------------------------------------------------
-func (io *cio)ReadUserTask(uid string, tid string) (map[string]interface{}, error) {
-	resp, err := io.readHashItem(KEY_CACHE_USER, uid, KEY_CACHE_TASK, tid)
-	return resp, err
-}
-
-func (io *cio)WriteUserTask(uid string, tid string, updateAttrs map[string]interface{}) (error) {
-	err := io.writeHashItem(KEY_CACHE_USER, uid, KEY_CACHE_TASK, tid, updateAttrs)
-	return err
-}
-
-func (io *cio)DelUserTask(uid string, tid string) (error) {
-	err := io.delHashItem(KEY_CACHE_USER, uid, KEY_CACHE_TASK, tid)
 	return err
 }
 

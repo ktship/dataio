@@ -20,32 +20,31 @@ type TableSuite struct {
 }
 
 func (s *TableSuite) SetUpSuite(c *C) {
-
-	list, err := s.io.ddbio.ListTables()
+	list, err := s.io.Ddbio.listTables()
 	if err != nil {
 		c.Fatal(err)
 	}
-	if s.io.ddbio.isExistTableByName(list.TableNames, TEST_TABLE_NAME_USERS) {
-		if err := s.io.ddbio.DeleteTable(TEST_TABLE_NAME_USERS) ; err != nil {
+	if s.io.Ddbio.isExistTableByName(list.TableNames, TEST_TABLE_NAME_USERS) {
+		if err := s.io.Ddbio.deleteTable(TEST_TABLE_NAME_USERS) ; err != nil {
 			c.Fatal(err)
 		}
 	}
-	if s.io.ddbio.isExistTableByName(list.TableNames, TEST_TABLE_NAME_ACCOUNTS) {
-		if err := s.io.ddbio.DeleteTable(TEST_TABLE_NAME_ACCOUNTS) ; err != nil {
+	if s.io.Ddbio.isExistTableByName(list.TableNames, TEST_TABLE_NAME_ACCOUNTS) {
+		if err := s.io.Ddbio.deleteTable(TEST_TABLE_NAME_ACCOUNTS) ; err != nil {
 			c.Fatal(err)
 		}
 	}
 
-	if err = s.io.ddbio.CreateHashTable(TEST_TABLE_NAME_USERS, 1, 1) ; err != nil {
+	if err = s.io.Ddbio.createHashTable(TEST_TABLE_NAME_USERS, 1, 1) ; err != nil {
 		c.Fatal(err)
 	}
-	if err = s.io.ddbio.CreateHashTable(TEST_TABLE_NAME_ACCOUNTS, 1, 1) ; err != nil {
+	if err = s.io.Ddbio.createHashTable(TEST_TABLE_NAME_ACCOUNTS, 1, 1) ; err != nil {
 		c.Fatal(err)
 	}
 
-	s.io.ddbio.WaitUntilStatus(TEST_TABLE_NAME_USERS, "ACTIVE")
+	s.io.Ddbio.waitUntilStatus(TEST_TABLE_NAME_USERS, "ACTIVE")
 
-	s.io.cio.FlushAll()
+	s.io.cio.FlushDB()
 	s.io.cio.SetTTL(10)
 }
 func (s *TableSuite) SetUpTest(c *C) {
@@ -53,7 +52,7 @@ func (s *TableSuite) SetUpTest(c *C) {
 func (s *TableSuite) TearDownTest(c *C) {
 }
 func (s *TableSuite) TearDownSuite(c *C) {
-	if err := s.io.ddbio.DeleteTable(TEST_TABLE_NAME_USERS) ; err != nil {
+	if err := s.io.Ddbio.deleteTable(TEST_TABLE_NAME_USERS) ; err != nil {
 		c.Fatal(err)
 	}
 }
@@ -79,23 +78,23 @@ func (s *TableSuite) Test001_DynamoDBIO(c *C) {
 
 	// 일단 데이터를 씀.
 	var err error
-	err = s.io.ddbio.writeHashItem(TEST_TABLE_NAME_USERS, "111", "", "", data1)
+	err = s.io.Ddbio.writeHashItem(TEST_TABLE_NAME_USERS, "111", "", "", data1)
 	if (err != nil) {
 		c.Fatal(err)
 	}
 
-	err = s.io.ddbio.writeHashItem(TEST_TABLE_NAME_USERS, "222", "", "", data1)
+	err = s.io.Ddbio.writeHashItem(TEST_TABLE_NAME_USERS, "222", "", "", data1)
 	if (err != nil) {
 		c.Fatal(err)
 	}
 
-	err = s.io.ddbio.writeHashItem(TEST_TABLE_NAME_USERS, "333", "", "", data1)
+	err = s.io.Ddbio.writeHashItem(TEST_TABLE_NAME_USERS, "333", "", "", data1)
 	if (err != nil) {
 		c.Fatal(err)
 	}
 
 	// 1차적으로 쓴 내용 확인.
-	resp, errRead := s.io.ddbio.readHashItem(TEST_TABLE_NAME_USERS, "111", "", "")
+	resp, errRead := s.io.Ddbio.readHashItem(TEST_TABLE_NAME_USERS, "111", "", "")
 	if (errRead != nil) {
 		c.Fatal(err)
 	}
@@ -107,13 +106,13 @@ func (s *TableSuite) Test001_DynamoDBIO(c *C) {
 	}
 
 	// 2차적으로 데이터 갱신
-	err = s.io.ddbio.writeHashItem(TEST_TABLE_NAME_USERS, "111", "", "", data2)
+	err = s.io.Ddbio.writeHashItem(TEST_TABLE_NAME_USERS, "111", "", "", data2)
 	if (err != nil) {
 		c.Fatal(err)
 	}
 
 	// 2차적으로 갱신한 데이터 확인
-	resp, errRead = s.io.ddbio.readHashItem(TEST_TABLE_NAME_USERS, "111", "", "")
+	resp, errRead = s.io.Ddbio.readHashItem(TEST_TABLE_NAME_USERS, "111", "", "")
 	if (errRead != nil) {
 		c.Fatal(err)
 	}
@@ -241,28 +240,28 @@ func (s *TableSuite) Test004_CacheIO_Hash(c *C) {
 
 	// 일단 데이터를 씀.
 	var err error
-	err = s.io.cio.WriteUserTask("000", "1", data1)
+	err = s.io.cio.writeHashItem(KEY_USER, "000", KEY_TASK, "1", data1)
 	if (err != nil) {
 		c.Fatal(err)
 	}
 	log.Printf(" s.data : %v", data1)
 
 	// cache 내용 읽기 --------------------
-	resp, errRead := s.io.cio.ReadUserTask("000", "1")
+	resp, errRead := s.io.cio.readHashItem(KEY_USER, "000", KEY_TASK, "1")
 	if (errRead != nil) {
 		c.Fatal(errRead)
 	}
 
 	log.Printf(" resp : %v", resp)
 
-	err = s.io.cio.WriteUserTask("111", "0", data1)
+	err = s.io.cio.writeHashItem(KEY_USER, "111", KEY_TASK, "0", data1)
 	if (err != nil) {
 		c.Fatal(err)
 	}
 	log.Printf(" s.data : %v", data1)
 
 	// cache 내용 읽기 --------------------
-	resp, errRead = s.io.cio.ReadUserTask("111", "0")
+	resp, errRead = s.io.cio.readHashItem(KEY_USER, "111", KEY_TASK, "0")
 	if (errRead != nil) {
 		c.Fatal(errRead)
 	}

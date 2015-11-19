@@ -3,23 +3,23 @@ import "strconv"
 
 func New() *dataio {
 	return &dataio{
-		ddbio: NewDB(),
+		Ddbio: NewDB(),
 		cio: NewCache(),
 	}
 }
 
 type dataio struct {
-	ddbio 	*ddbio
+	Ddbio 	*ddbio
 	cio   	*cio
 }
 
 // -------------------------------------------------
-// user : task
+// 디비와 캐쉬를 동시에 사용
 // -------------------------------------------------
 // 1. 캐쉬에서 읽고 키가 없으면,
 // 2. 디비에서 읽음.
 // 3. 디비에서 읽었으면, 캐쉬에 저장.
-func (io *dataio)read2Way(hkey string, hid string, hkey2 string, hid2 string) (map[string]interface{}, error) {
+func (io *dataio)Read2Way(hkey string, hid string, hkey2 string, hid2 string) (map[string]interface{}, error) {
 	// 1. 캐쉬에서 읽고 키가 없으면,
 	resp, err := io.cio.readHashItem(hkey, hid, hkey2, hid2)
 	if err != nil {
@@ -31,7 +31,7 @@ func (io *dataio)read2Way(hkey string, hid string, hkey2 string, hid2 string) (m
 	}
 
 	// 2. 캐쉬에 없으므로, 디비에서 읽음.
-	resp, err = io.ddbio.readHashItem(hkey, hid, hkey2, hid2)
+	resp, err = io.Ddbio.readHashItem(hkey, hid, hkey2, hid2)
 	if err != nil {
 		return resp, err
 	}
@@ -45,10 +45,9 @@ func (io *dataio)read2Way(hkey string, hid string, hkey2 string, hid2 string) (m
 	return resp, err
 }
 
-// 1. 디비에 쓰기
-// 2. 캐쉬에 쓰기
-func (io *dataio)write2Way(hkey string, hid string, hkey2 string, hid2 string, updateAttrs map[string]interface{}) (error) {
-	err := io.ddbio.writeHashItem(hkey, hid, hkey2, hid2, updateAttrs)
+// 1. 디비 / 캐쉬에 쓰기
+func (io *dataio)Write2Way(hkey string, hid string, hkey2 string, hid2 string, updateAttrs map[string]interface{}) (error) {
+	err := io.Ddbio.writeHashItem(hkey, hid, hkey2, hid2, updateAttrs)
 	if err != nil {
 		return err
 	}
@@ -60,8 +59,8 @@ func (io *dataio)write2Way(hkey string, hid string, hkey2 string, hid2 string, u
 	return nil
 }
 
-func (io *dataio)del2Way(hkey string, hid string, hkey2 string, hid2 string) (error) {
-	err := io.ddbio.delHashItem(hkey, hid, hkey2, hid2)
+func (io *dataio)Del2Way(hkey string, hid string, hkey2 string, hid2 string) (error) {
+	err := io.Ddbio.delHashItem(hkey, hid, hkey2, hid2)
 	if err != nil {
 		return err
 	}
@@ -73,20 +72,66 @@ func (io *dataio)del2Way(hkey string, hid string, hkey2 string, hid2 string) (er
 	return nil
 }
 
+/*
+// -------------------------------------------------
+// 기타 API 들
+// -------------------------------------------------
+// Dynamo DB 관련
+func (io *dataio)CreateHashTable(tableName string, readCap int, writeCap int) error {
+	if err := io.Ddbio.createHashTable(tableName, readCap, writeCap); err != nil {
+		return err
+	}
+	io.Ddbio.waitUntilStatus(tableName, "ACTIVE")
+	return nil
+}
+
+func (io *dataio)ListTables() ([]*string, error) {
+	ret, err := io.Ddbio.listTables()
+	return ret.TableNames, err
+}
+
+func (io *dataio)DeleteTable(tableName string) error {
+	list, err := io.ListTables()
+	if err != nil {
+		return err
+	}
+	if io.Ddbio.isExistTableByName(list, tableName) {
+		if err := io.Ddbio.deleteTable(tableName) ; err != nil {
+			return err
+		}
+	}
+
+	return err
+}
+
+// Cache 관련
+func (io *dataio)CacheFlushDB() error {
+	return io.cio.FlushDB()
+}
+
+func (io *dataio)CacheGetTTL() int {
+	return io.cio.GetTTL()
+}
+
+func (io *dataio)CacheSetTTL(sec int) {
+	io.cio.SetTTL(sec)
+}
+*/
+
 // -------------------------------------------------
 // user : taskbytime interface
 // -------------------------------------------------
 func (io *dataio)ReadUserTask(uid int, tid int) (map[string]interface{}, error) {
-	resp, err := io.read2Way(KEY_USER, strconv.Itoa(uid), KEY_TASK, strconv.Itoa(tid))
+	resp, err := io.Read2Way(KEY_USER, strconv.Itoa(uid), KEY_TASK, strconv.Itoa(tid))
 	return resp, err
 }
 
 func (io *dataio)WriteUserTask(uid int, tid int, updateAttrs map[string]interface{}) (error) {
-	err := io.write2Way(KEY_USER, strconv.Itoa(uid), KEY_TASK, strconv.Itoa(tid), updateAttrs)
+	err := io.Write2Way(KEY_USER, strconv.Itoa(uid), KEY_TASK, strconv.Itoa(tid), updateAttrs)
 	return err
 }
 
 func (io *dataio)DelUserTask(uid int, tid int) (error) {
-	err := io.del2Way(KEY_USER, strconv.Itoa(uid), KEY_TASK, strconv.Itoa(tid))
+	err := io.Del2Way(KEY_USER, strconv.Itoa(uid), KEY_TASK, strconv.Itoa(tid))
 	return err
 }
