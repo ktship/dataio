@@ -116,6 +116,9 @@ func (s *TableSuite) Test001_DynamoDBIO(c *C) {
 	if (errRead != nil) {
 		c.Fatal(err)
 	}
+	if (resp["createTime"] != int(tt)) {
+		c.Fatalf(" createTime(%d) is not %d... type: %T", resp["createTime"], tt, resp["createTime"])
+	}
 	if (resp["greeting"] != "hello 2") {
 		c.Fatalf(" str(%s) is not test...", resp["greeting"])
 	}
