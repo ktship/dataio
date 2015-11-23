@@ -98,7 +98,7 @@ func (s *TableSuite) Test001_DynamoDBIO(c *C) {
 	if (errRead != nil) {
 		c.Fatal(err)
 	}
-	if (resp["createTime"] != int(tt)) {
+	if (resp["createTime"] != strconv.Itoa(int(tt))) {
 		c.Fatalf(" createTime(%d) is not %d... type: %T", resp["createTime"], tt, resp["createTime"])
 	}
 	if (resp["greeting"] != "hello") {
@@ -116,13 +116,16 @@ func (s *TableSuite) Test001_DynamoDBIO(c *C) {
 	if (errRead != nil) {
 		c.Fatal(err)
 	}
-	if (resp["createTime"] != int(tt)) {
+	if (resp["createTime"] != strconv.Itoa(int(tt))) {
 		c.Fatalf(" createTime(%d) is not %d... type: %T", resp["createTime"], tt, resp["createTime"])
 	}
 	if (resp["greeting"] != "hello 2") {
 		c.Fatalf(" str(%s) is not test...", resp["greeting"])
 	}
 	if (resp["ac"] != "test") {
+		c.Fatalf(" str(%s) is not test...", resp["greeting2"])
+	}
+	if (resp["b"] != "1234") {
 		c.Fatalf(" str(%s) is not test...", resp["greeting2"])
 	}
 }
@@ -188,6 +191,9 @@ func (s *TableSuite) Test002_CacheIO_BASE(c *C) {
 		if (resp["ac"] != "test") {
 			c.Fatalf(" str(%s) is not test...", resp["test"])
 		}
+		if (resp["b"] != "1234") {
+			c.Fatalf(" str(%s) is not test...", resp["test"])
+		}
 	}
 }
 
@@ -237,8 +243,12 @@ func (s *TableSuite) Test004_CacheIO_Hash(c *C) {
 
 	// Test Data
 	data1 := map[string]interface{} {
-		"createTime":time.Now().Unix(),
-		"s_greeting": "hello",
+		"a": "hello",
+		"b": 1234,
+	}
+	data2 := map[string]interface{} {
+		"a": "hello2",
+		"c": 1000000000,
 	}
 
 	// 일단 데이터를 씀.
@@ -247,29 +257,37 @@ func (s *TableSuite) Test004_CacheIO_Hash(c *C) {
 	if (err != nil) {
 		c.Fatal(err)
 	}
-	log.Printf(" s.data : %v", data1)
 
 	// cache 내용 읽기 --------------------
 	resp, errRead := s.io.cio.readHashItem(KEY_USER, "000", KEY_TASK, "1")
 	if (errRead != nil) {
 		c.Fatal(errRead)
 	}
+	if (resp["a"] != "hello") {
+		c.Fatalf("hello")
+	}
+	if (resp["b"] != "1234") {
+		c.Fatalf("1234")
+	}
 
-	log.Printf(" resp : %v", resp)
-
-	err = s.io.cio.writeHashItem(KEY_USER, "111", KEY_TASK, "0", data1)
+	err = s.io.cio.writeHashItem(KEY_USER, "000", KEY_TASK, "1", data2)
 	if (err != nil) {
 		c.Fatal(err)
 	}
-	log.Printf(" s.data : %v", data1)
 
 	// cache 내용 읽기 --------------------
-	resp, errRead = s.io.cio.readHashItem(KEY_USER, "111", KEY_TASK, "0")
+	resp, errRead = s.io.cio.readHashItem(KEY_USER, "000", KEY_TASK, "1")
 	if (errRead != nil) {
 		c.Fatal(errRead)
 	}
-
-	log.Printf(" resp : %v", resp)
-
+	if (resp["a"] != "hello2") {
+		c.Fatalf("hello")
+	}
+	if (resp["b"] != "1234") {
+		c.Fatalf("1234")
+	}
+	if (resp["c"] != "1000000000") {
+		c.Fatalf("1000000000")
+	}
 }
 
