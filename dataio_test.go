@@ -5,7 +5,6 @@ import (
 	. "gopkg.in/check.v1"
 	"log"
 	"time"
-	"strconv"
 )
 
 
@@ -98,7 +97,7 @@ func (s *TableSuite) Test001_DynamoDBIO(c *C) {
 	if (errRead != nil) {
 		c.Fatal(err)
 	}
-	if (resp["createTime"] != strconv.Itoa(int(tt))) {
+	if (resp["createTime"] != int(tt)) {
 		c.Fatalf(" createTime(%d) is not %d... type: %T", resp["createTime"], tt, resp["createTime"])
 	}
 	if (resp["greeting"] != "hello") {
@@ -116,7 +115,7 @@ func (s *TableSuite) Test001_DynamoDBIO(c *C) {
 	if (errRead != nil) {
 		c.Fatal(err)
 	}
-	if (resp["createTime"] != strconv.Itoa(int(tt))) {
+	if (resp["createTime"] != int(tt)) {
 		c.Fatalf(" createTime(%d) is not %d... type: %T", resp["createTime"], tt, resp["createTime"])
 	}
 	if (resp["greeting"] != "hello 2") {
@@ -125,7 +124,7 @@ func (s *TableSuite) Test001_DynamoDBIO(c *C) {
 	if (resp["ac"] != "test") {
 		c.Fatalf(" str(%s) is not test...", resp["greeting2"])
 	}
-	if (resp["b"] != "1234") {
+	if (resp["b"] != 1234) {
 		c.Fatalf(" str(%s) is not test...", resp["greeting2"])
 	}
 }
@@ -158,13 +157,8 @@ func (s *TableSuite) Test002_CacheIO_BASE(c *C) {
 		c.Fatal(errRead)
 	}
 
-	ct := resp["createTime"].(string)
-	intct, err := strconv.Atoi(ct)
-	if (err != nil) {
-		c.Fatal(err)
-	}
-	if (intct != int(tt)) {
-		c.Fatalf(" createTime(%d) is not %d... type: %T", ct, tt, resp["createTime"])
+	if (resp["createTime"] != int(tt)) {
+		c.Fatalf(" createTime(%d) is not %d... type: %T", tt, resp["createTime"])
 	}
 	if (resp["s_greeting"] != "hello") {
 		c.Fatalf(" greeting(%s) is not tt... type: %T", resp["s_greeting"], resp["s_greeting"])
@@ -182,7 +176,7 @@ func (s *TableSuite) Test002_CacheIO_BASE(c *C) {
 		if (errRead != nil) {
 			c.Fatal(err)
 		}
-		if (resp["createTime"] != strconv.Itoa(int(tt))) {
+		if (resp["createTime"] != int(tt)) {
 			c.Fatalf(" str(%s) is not test...", resp["greeting"])
 		}
 		if (resp["greeting"] != "hello 2") {
@@ -191,7 +185,7 @@ func (s *TableSuite) Test002_CacheIO_BASE(c *C) {
 		if (resp["ac"] != "test") {
 			c.Fatalf(" str(%s) is not test...", resp["test"])
 		}
-		if (resp["b"] != "1234") {
+		if (resp["b"] != 1234) {
 			c.Fatalf(" str(%s) is not test...", resp["test"])
 		}
 	}
@@ -219,7 +213,7 @@ func (s *TableSuite) Test003_CacheIO_TTL(c *C) {
 	if (errRead != nil) {
 		c.Fatal(errRead)
 	}
-	if (resp["createTime"] != strconv.Itoa(int(tt))) {
+	if (resp["createTime"] != int(tt)) {
 		c.Fatalf(" createTime(%d) is not %s...", tt, resp["createTime"])
 	}
 	if (resp["s_greeting"] != "hello") {
@@ -266,7 +260,7 @@ func (s *TableSuite) Test004_CacheIO_Hash(c *C) {
 	if (resp["a"] != "hello") {
 		c.Fatalf("hello")
 	}
-	if (resp["b"] != "1234") {
+	if (resp["b"] != 1234) {
 		c.Fatalf("1234")
 	}
 
@@ -283,10 +277,10 @@ func (s *TableSuite) Test004_CacheIO_Hash(c *C) {
 	if (resp["a"] != "hello2") {
 		c.Fatalf("hello")
 	}
-	if (resp["b"] != "1234") {
+	if (resp["b"] != 1234) {
 		c.Fatalf("1234")
 	}
-	if (resp["c"] != "1000000000") {
+	if (resp["c"] != 1000000000) {
 		c.Fatalf("1000000000")
 	}
 }

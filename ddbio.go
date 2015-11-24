@@ -125,7 +125,7 @@ func (io *ddbio)writeHashItem(hkey string, hid string, hkey2 string, hid2 string
 
 	var params *dynamodb.UpdateItemInput
 	if hkey2 == "" {
-		log.Printf("TableName : %s \n",hkey)
+//		log.Printf("TableName : %s \n",hkey)
 		params = &dynamodb.UpdateItemInput{
 			TableName: aws.String(hkey), // Required
 			Key: map[string]*dynamodb.AttributeValue{
@@ -142,7 +142,7 @@ func (io *ddbio)writeHashItem(hkey string, hid string, hkey2 string, hid2 string
 			ExpressionAttributeValues: 	 exprValues,
 		}
 	} else {
-		log.Printf("TableName : %s \n",hkey2)
+//		log.Printf("TableName : %s \n",hkey2)
 		params = &dynamodb.UpdateItemInput{
 			TableName: aws.String(hkey2), // Required
 			Key: map[string]*dynamodb.AttributeValue{
