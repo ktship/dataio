@@ -3,6 +3,7 @@ package dataio
 import (
 	"github.com/garyburd/redigo/redis"
 	"fmt"
+	"strconv"
 )
 
 /*
@@ -88,7 +89,13 @@ func (io *cio)readHashItem(hkey string, hid string, hkey2 string, hid2 string) (
 	retMap := make(map[string]interface{})
 	for ii:=0 ; ii<len(out) ; ii = ii+2 {
 		key := string(out[ii].([]byte))
-		retMap[key] = string(out[ii + 1].([]byte))
+		value := string(out[ii + 1].([]byte))
+		valueInt, err := strconv.Atoi(value)
+		if err != nil {
+			retMap[key] = value
+		} else {
+			retMap[key] = valueInt
+		}
 	}
 
 	return retMap, err

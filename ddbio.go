@@ -78,7 +78,11 @@ func (io *ddbio)readHashItem(hkey string, hid string, hkey2 string, hid2 string)
 		if (v.S != nil) {
 			outMap[k] = *v.S
 		} else if (v.N != nil) {
-			outMap[k] = *v.N
+			ii, err := strconv.Atoi(*v.N)
+			if err != nil {
+				return nil, err
+			}
+			outMap[k] = ii
 		} else {
 			log.Printf("ddbio ReadItemAll ERROR: unknown type of attr.. check! key: %s, value:%+v", k, v)
 			return nil, fmt.Errorf("ddbio ReadItemAll ERROR: unknown type of attr.. check! key: %s, value:%+v", k, v)
